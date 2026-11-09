@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="bg">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>{{META_TITLE}}</title>
+    <meta name="description" content="{{META_DESCRIPTION}}">
+    <meta name="theme-color" content="#25282a">
+    <meta name="color-scheme" content="dark">
+    <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+    <link rel="canonical" href="{{CANONICAL_URL}}">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="bg_BG">
+    <meta property="og:site_name" content="На студ">
+    <meta property="og:title" content="{{SOCIAL_TITLE}}">
+    <meta property="og:description" content="{{SOCIAL_DESCRIPTION}}">
+    <meta property="og:url" content="{{CANONICAL_URL}}">
+    <meta property="og:image" content="{{OG_IMAGE_URL}}">
+    <meta property="og:image:secure_url" content="{{OG_IMAGE_URL}}">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="{{META_DESCRIPTION}}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{SOCIAL_TITLE}}">
+    <meta name="twitter:description" content="{{SOCIAL_DESCRIPTION}}">
+    <meta name="twitter:image" content="{{OG_IMAGE_URL}}">
+    <meta name="twitter:image:alt" content="{{META_DESCRIPTION}}">
+    <link rel="stylesheet" href="./styles.css">
+    <script type="module" src="./app.js"></script>
+    <script type="module" src="./road.js"></script>
+  </head>
+  <body>
+    <div id="counter-app">
+      <div class="st-page">
+        <main class="st-content">
+          <section class="st-counter" aria-labelledby="counter-heading">
+            <div>
+              <h1 id="counter-heading"><a href="https://toplo.bg/accidents-and-maintenance" target="_blank" rel="noopener noreferrer">Аварии и ремонти</a> <time id="observed-label" datetime="{{CURRENT_DATETIME}}">{{OBSERVED_LABEL}}</time></h1>
+              <p class="st-number" id="current-count">{{COUNT}}</p>
+              <p class="st-comparison" id="comparison">{{COMPARISON}}</p>
+              <p class="st-data-notice" id="data-notice" role="status">{{DATA_NOTICE}}</p>
+            </div>
+          </section>
+          <section class="st-timeline" aria-labelledby="timeline-heading">
+            <div class="st-timeline-heading">
+              <h2 id="timeline-heading">Как се променя броят</h2>
+              <p class="st-timeline-selected" id="timeline-selected" aria-live="polite"></p>
+            </div>
+            <div class="st-chart" id="timeline-chart">
+              <svg class="st-chart-svg" id="timeline-svg" role="img" aria-label="Брой аварии и ремонти по дни"></svg>
+              <button class="st-chart-interaction" id="timeline-interaction" type="button" aria-label="Избери ден от графиката. Използвай стрелките наляво и надясно."><span class="st-sr-only">Избери ден от графиката</span></button>
+              <p class="st-timeline-empty" id="timeline-empty">Историята ще се появи тук.</p>
+            </div>
+            <p class="st-timeline-period" id="timeline-period"></p>
+          </section>
+        </main>
+        <section class="st-street" aria-label="Улица с шахти">
+          <div class="st-road-viewport">
+            <div class="st-road-plane">
+              <div class="st-asphalt" aria-hidden="true"></div>
+              <div class="st-curb" aria-hidden="true"></div>
+              <div class="st-line" aria-hidden="true"></div>
+              <div class="st-manholes"></div>
+            </div>
+          </div>
+          <div class="st-effects" aria-hidden="true"></div>
+          <span class="st-hint">Пусни малко пара.</span>
+          <footer class="st-footer">
+            <p class="st-credit">с данни от <a href="https://oboapp.online" target="_blank" rel="noopener noreferrer">OboApp</a></p>
+          </footer>
+        </section>
+        <span class="st-announcement" role="status" aria-live="polite"></span>
+      </div>
+    </div>
+    <script id="initial-timeline" type="application/json">{{INITIAL_DATA}}</script>
+  </body>
+</html>
