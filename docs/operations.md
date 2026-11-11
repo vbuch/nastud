@@ -15,7 +15,7 @@ production publisher.
 - pnpm 10.11.0 and the committed lockfile.
 - Repository variable `COUNTER_TIMELINE_URL`: `https://api.oboapp.online/v1/sources/toplo-bg/timeline?days=366`.
 - Repository secret `COUNTER_API_KEY`: a valid OboApp API key for this consumer.
-- Repository variable `PUBLISH_ENABLED`: `true` after production configuration and the domain cutover are ready. Keep it `false` during migration.
+- Repository variable `PUBLISH_ENABLED`: `true` after the API secret and Pages are configured. Keep it `false` while preparing the extraction, then enable it for the real-data check before switching the domain.
 - Pages source: GitHub Actions.
 - Pages deployment environment: `github-pages`.
 - Custom domain: `nastud.site`.
@@ -73,11 +73,11 @@ node build.mjs --fetch --require-current
 2. Place the standalone scripts, `src/`, assets and tests at this repository's root. Retain the font license and relevant source license.
 3. Configure the standalone workflow, repository variable, secret, Pages source and deployment environment.
 4. Keep `PUBLISH_ENABLED` false and verify the fixture artifact and tests from the new repository before transferring the live domain.
-5. Disable or remove OboApp's `counter-pages.yml` publisher at cutover so only this repository publishes nastud.site.
-6. Transfer the custom-domain assignment from `vbuch/oboapp` to `vbuch/nastud` and verify the new Pages configuration.
-7. Preserve the existing valid DNS configuration. Moving between repositories under the same GitHub account does not by itself require changing the existing GitHub Pages address records.
-8. Set `PUBLISH_ENABLED` to true, publish from this repository, check the live site and data, and verify HTTPS and sharing URLs.
-9. Replace OboApp's consumer documentation with a link to this repository, while keeping its API documentation and provider-owned history records there.
+5. Configure the authorized API secret, set `PUBLISH_ENABLED` to true and publish a real-data build at `https://vbuch.github.io/nastud/` while this repository's custom domain remains unset. Confirm both API reads, the deployed list and matching observation timestamps before changing the current live site.
+6. Disable OboApp's `counter-pages.yml` publisher and wait for any active publication to finish.
+7. Clear the old custom-domain assignment, assign `nastud.site` to `vbuch/nastud` and verify the new Pages configuration and HTTPS. The new repository already has a successful production deployment at this point.
+8. Preserve the existing valid DNS configuration. Moving between repositories under the same GitHub account does not by itself require changing the existing GitHub Pages address records. Verify the live counter, list, JSON and sharing URLs at the custom domain.
+9. Merge the OboApp extraction cleanup, retain its provider-owned history archive and API documentation, and remove the retired Pages site and consumer-only Actions configuration.
 
 GitHub's repository custom-domain setting is required. A generated `CNAME` file
 alone does not transfer that setting. Follow
