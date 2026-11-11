@@ -4,10 +4,10 @@ Source repository: [vbuch/nastud](https://github.com/vbuch/nastud).
 Production URL: [https://nastud.site/](https://nastud.site/).
 Publisher: [Pages workflow](https://github.com/vbuch/nastud/actions/workflows/pages.yml).
 
-The intended hosting target is GitHub Pages. Repository extraction alone does
-not transfer the live custom domain, secrets or Pages configuration. Complete
-and verify the cutover steps below before treating the new repository as the
-production publisher.
+GitHub Pages serves production from this repository. The move from
+`vbuch/oboapp` completed on 11 November 2026. The domain, publishing schedule,
+API secret and Pages configuration belong to `vbuch/nastud`. OboApp supplies
+the API and owns the source data.
 
 ## Runtime and repository configuration
 
@@ -68,6 +68,9 @@ node build.mjs --fetch --require-current
 ```
 
 ## Initial repository cutover
+
+The following procedure records the verified migration. The previous Pages
+site and consumer-only Actions configuration have been removed from OboApp.
 
 1. Extract `counter/` from OboApp using Git subtree history through commit `ead7ffc68fc1411582a85045c2bf15a96a1ca648`.
 2. Place the standalone scripts, `src/`, assets and tests at this repository's root. Retain the font license and relevant source license.
