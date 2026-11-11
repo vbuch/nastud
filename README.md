@@ -2,8 +2,9 @@
 
 The standalone page for `nastud.site` shows the current number of accidents and
 repairs on Toplo's website, the change from the previous daily closing count,
-and an interactive daily timeline. The road animation is independent of the
-source counts.
+an interactive daily timeline, and a complete sortable incident list behind
+"Виж всички аварии и ремонти". The road animation is independent of the source
+counts.
 
 The frontend is plain HTML, CSS and JavaScript. GitHub Pages hosts only the
 generated `dist/` directory. The API key is used during the build and stays in
@@ -11,14 +12,26 @@ GitHub Actions secrets.
 
 ## Data flow
 
-1. The existing Toplo crawler records a complete listing snapshot on each run.
+1. The existing Toplo crawler records a complete listing snapshot on each run,
+   including each incident's identity, reported start and estimated completion.
 2. `source-daily-counts` records the latest successful observation for a Sofia
    calendar day. The scheduled job runs at 23:00 in `Europe/Sofia`.
 3. `GET /v1/sources/toplo-bg/timeline?days=366` returns the current snapshot,
    daily counts and comparison. It uses normal API key authentication.
-4. The Pages workflow fetches the API at minutes 7 and 37, then publishes the
-   HTML, `timeline.json` and social images together. The page refreshes the JSON
-   while open.
+4. `GET /v1/sources/toplo-bg/incidents` adds the first saved source observation
+   and its estimate to every currently listed entry.
+5. The Pages workflow fetches both endpoints at minutes 7 and 37, then publishes
+   the HTML, `timeline.json`, `incidents.json` and social images together. The
+   page refreshes the JSON while open. The list's count and source-check time
+   are also used for the counter so both describe the same observation.
+
+The list sorts by reported age, net extension of the completion estimate,
+newest reported start, or earliest current estimate. It can show all entries,
+only accidents, or only repairs. Missing first estimates stay unavailable.
+"First recorded estimate" means the estimate in OboApp's first saved source
+record. Earlier promises and intermediate revisions may be unavailable.
+Changed start dates are flagged because an incident ID identifies a website
+record and does not establish an uninterrupted outage.
 
 The Toplo crawl keeps its existing daytime schedule: every 30 minutes from
 07:00 through 22:30 in `Europe/Sofia`. Overnight, the page preserves the last
@@ -49,7 +62,7 @@ fetch or invalid response fails publication, keeping the previous site live.
 ```sh
 pnpm --dir counter --ignore-workspace install --frozen-lockfile
 pnpm --dir counter test
-node counter/build.mjs --data counter/test/fixtures/timeline.json
+node counter/build.mjs --data counter/test/fixtures/timeline.json --incidents counter/test/fixtures/incidents.json
 pnpm --dir counter dev
 ```
 
@@ -66,6 +79,10 @@ The default public URL is `https://nastud.site/`. The build supports
 ## Deployment
 
 Deploy the new backend, database indexes and Terraform nightly job first.
+The incident-list endpoint needs one successful crawl with incident details;
+legacy count-only snapshots remain valid for the counter and daily history.
+Production publication fails if either API read is unavailable or invalid,
+preserving the last successful page.
 The production database already contains the recovered history. For a new
 database, import it once through the database abstraction:
 

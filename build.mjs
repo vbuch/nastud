@@ -5,16 +5,20 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { escapeHtml, normalizeTimeline, presentation, serializeData } from "./data.mjs";
 import { renderShareImage } from "./share-image.mjs";
+import { normalizeIncidents } from "./src/incidents.js";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 
-export async function fetchTimeline(url, apiKey) {
+async function fetchApiJson(url, apiKey, label) {
   const target = new URL(url);
   if (target.protocol !== "https:" && !(target.protocol === "http:" && ["localhost", "127.0.0.1"].includes(target.hostname))) {
-    throw new Error("The timeline API must use HTTPS");
+    throw new Error("The " + label + " API must use HTTPS");
+  }
+  if (target.username || target.password) {
+    throw new Error("The API URL must not contain credentials");
   }
   if (!apiKey) {
-    throw new Error("COUNTER_API_KEY is required to fetch the timeline");
+    throw new Error("COUNTER_API_KEY is required to fetch the " + label);
   }
   const response = await fetch(target, {
     headers: { "X-Api-Key": apiKey, Accept: "application/json" },
@@ -22,17 +26,37 @@ export async function fetchTimeline(url, apiKey) {
     signal: AbortSignal.timeout(15000),
   });
   if (!response.ok) {
-    throw new Error("Timeline API returned HTTP " + response.status);
+    throw new Error(label + " API returned HTTP " + response.status);
   }
   const content = await response.text();
   if (content.length > 1_000_000) {
-    throw new Error("Timeline response exceeds the expected size");
+    throw new Error(label + " response exceeds the expected size");
   }
   return JSON.parse(content);
 }
 
+export function fetchTimeline(url, apiKey) {
+  return fetchApiJson(url, apiKey, "timeline");
+}
+
+export function getIncidentsUrl(timelineUrl) {
+  const target = new URL(timelineUrl);
+  if (!target.pathname.endsWith("/sources/toplo-bg/timeline")) {
+    throw new Error("The timeline URL must identify the Toplo source timeline");
+  }
+  target.pathname = target.pathname.replace(/\/timeline$/, "/incidents");
+  target.search = "";
+  target.hash = "";
+  return target.href;
+}
+
+export async function fetchIncidents(timelineUrl, apiKey) {
+  return normalizeIncidents(await fetchApiJson(getIncidentsUrl(timelineUrl), apiKey, "incidents"));
+}
+
 export async function buildSite({
   data,
+  incidents = null,
   outDirectory = resolve(directory, "dist"),
   siteUrl = "https://nastud.site/",
   requireCurrent = false,
@@ -45,13 +69,18 @@ export async function buildSite({
   if (!canonical.pathname.endsWith("/")) {
     canonical.pathname += "/";
   }
-  const timeline = normalizeTimeline(data ?? {
+  const incidentListing = incidents === null ? null : normalizeIncidents(incidents);
+  const timelineInput = data ?? {
     sourceType: "toplo-bg",
     locality: "bg.sofia",
     current: null,
     daily: [],
     comparison: null,
-  });
+  };
+  const timeline = normalizeTimeline(incidentListing ? {
+    ...timelineInput,
+    current: { count: incidentListing.count, observedAt: incidentListing.observedAt },
+  } : timelineInput);
   if (requireCurrent && !timeline.current) {
     throw new Error("A current snapshot is required before publishing");
   }
@@ -75,6 +104,7 @@ export async function buildSite({
     CANONICAL_URL: escapeHtml(canonical.href),
     OG_IMAGE_URL: escapeHtml(imageUrl),
     INITIAL_DATA: serializeData(timeline),
+    INITIAL_INCIDENTS: serializeData(incidentListing),
   };
   const template = await readFile(resolve(directory, "src/index.html"), "utf8");
   const html = template.replace(/\{\{([A-Z_]+)\}\}/g, (match, name) => {
@@ -92,6 +122,7 @@ export async function buildSite({
   await Promise.all([
     writeFile(resolve(outDirectory, "index.html"), html),
     writeFile(resolve(outDirectory, "timeline.json"), JSON.stringify(timeline)),
+    writeFile(resolve(outDirectory, "incidents.json"), JSON.stringify(incidentListing)),
     writeFile(resolve(outDirectory, imageName), image),
     writeFile(resolve(outDirectory, "share-square.png"), renderShareImage(timeline, { height: 1200, now })),
     writeFile(resolve(outDirectory, ".nojekyll"), ""),
@@ -100,15 +131,22 @@ export async function buildSite({
     writeFile(resolve(outDirectory, "sitemap.xml"), '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>' + escapeHtml(canonical.href) + "</loc></url></urlset>"),
   ]);
   console.log("Counter built with " + timeline.daily.length + " daily points.");
-  return { timeline, values, html, imageName, outDirectory };
+  return { timeline, incidents: incidentListing, values, html, imageName, outDirectory };
 }
 
 async function main() {
-  const { values } = parseArgs({ options: {
-    data: { type: "string" }, out: { type: "string" }, "site-url": { type: "string" },
-    fetch: { type: "boolean" }, "require-current": { type: "boolean" },
-  } });
+  const { values } = parseArgs({
+    options: {
+      data: { type: "string" },
+      incidents: { type: "string" },
+      out: { type: "string" },
+      "site-url": { type: "string" },
+      fetch: { type: "boolean" },
+      "require-current": { type: "boolean" },
+    },
+  });
   let data;
+  let incidents = null;
   if (values.data) {
     data = JSON.parse(await readFile(resolve(values.data), "utf8"));
   } else if (values.fetch) {
@@ -116,8 +154,18 @@ async function main() {
       throw new Error("COUNTER_TIMELINE_URL is required");
     }
     data = await fetchTimeline(process.env.COUNTER_TIMELINE_URL, process.env.COUNTER_API_KEY);
+    incidents = await fetchIncidents(process.env.COUNTER_TIMELINE_URL, process.env.COUNTER_API_KEY);
   }
-  await buildSite({ data, outDirectory: values.out ? resolve(values.out) : undefined, siteUrl: values["site-url"], requireCurrent: values["require-current"] });
+  if (values.incidents) {
+    incidents = JSON.parse(await readFile(resolve(values.incidents), "utf8"));
+  }
+  await buildSite({
+    data,
+    incidents,
+    outDirectory: values.out ? resolve(values.out) : undefined,
+    siteUrl: values["site-url"],
+    requireCurrent: values["require-current"],
+  });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

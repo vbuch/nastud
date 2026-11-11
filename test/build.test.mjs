@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildSite } from "../build.mjs";
+import { buildSite, fetchIncidents, fetchTimeline, getIncidentsUrl } from "../build.mjs";
 import { normalizeTimeline, presentation, serializeData } from "../data.mjs";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/timeline.json", import.meta.url), "utf8"));
+const incidents = JSON.parse(await readFile(new URL("./fixtures/incidents.json", import.meta.url), "utf8"));
 
 test("shows yesterday's change, retaining explicit dates when the data is old", () => {
   const timeline = normalizeTimeline(fixture);
@@ -128,4 +129,59 @@ test("publishes exactly the supplied API dates and counts without a historical-f
 
 test("refuses to publish an unavailable snapshot as a false count", async () => {
   await assert.rejects(buildSite({ data: { ...fixture, current: null }, requireCurrent: true }), /current snapshot is required/);
+});
+
+test("publishes the full listing and aligns the counter with its successful source check", async () => {
+  const outDirectory = await mkdtemp(join(tmpdir(), "nastud-list-build-"));
+  const input = structuredClone(incidents);
+  input.incidents[0].name = "</script><img src=x onerror=alert(1)>";
+  try {
+    const { html, timeline } = await buildSite({ data: fixture, incidents: input, outDirectory });
+    const published = JSON.parse(await readFile(join(outDirectory, "incidents.json"), "utf8"));
+    const bootstrap = /<script id="initial-incidents" type="application\/json">([\s\S]*?)<\/script>/.exec(html);
+
+    assert.equal(published.incidents.length, input.count);
+    assert.equal(published.incidents[0].firstEstimatedEnd, input.incidents[0].firstEstimatedEnd);
+    assert.deepEqual(timeline.current, { count: input.count, observedAt: input.observedAt });
+    assert.ok(bootstrap);
+    assert.equal(JSON.parse(bootstrap[1]).incidents[0].name, input.incidents[0].name);
+    assert.equal(bootstrap[1].includes("<"), false);
+  } finally {
+    await rm(outDirectory, { recursive: true, force: true });
+  }
+});
+
+test("derives the incident endpoint on the configured API origin without timeline query parameters", () => {
+  assert.equal(
+    getIncidentsUrl("https://api.example.com/v1/sources/toplo-bg/timeline?days=366#history"),
+    "https://api.example.com/v1/sources/toplo-bg/incidents",
+  );
+  assert.throws(() => getIncidentsUrl("https://api.example.com/v1/messages"), /Toplo source timeline/);
+});
+
+test("fetches authenticated listing data and refuses unavailable or partial listings", async (context) => {
+  const requests = [];
+  context.mock.method(globalThis, "fetch", async (url, options) => {
+    requests.push({ url: String(url), options });
+    return Response.json(incidents);
+  });
+  const result = await fetchIncidents("https://api.example.com/v1/sources/toplo-bg/timeline?days=366", "test-key");
+  assert.equal(result.count, 3);
+  assert.equal(requests[0].url, "https://api.example.com/v1/sources/toplo-bg/incidents");
+  assert.equal(requests[0].options.headers["X-Api-Key"], "test-key");
+  assert.equal(requests[0].options.redirect, "error");
+
+  globalThis.fetch = async () => {
+    return new Response("Unavailable", { status: 503 });
+  };
+  await assert.rejects(fetchIncidents("https://api.example.com/v1/sources/toplo-bg/timeline", "test-key"), /HTTP 503/);
+  globalThis.fetch = async () => {
+    return Response.json({ ...incidents, count: 4 });
+  };
+  await assert.rejects(fetchIncidents("https://api.example.com/v1/sources/toplo-bg/timeline", "test-key"));
+});
+
+test("rejects insecure API URLs and credentials embedded in URLs before sending a key", async () => {
+  await assert.rejects(fetchTimeline("http://api.example.com/v1/sources/toplo-bg/timeline", "test-key"), /HTTPS/);
+  await assert.rejects(fetchTimeline("https://user:password@api.example.com/v1/sources/toplo-bg/timeline", "test-key"), /credentials/);
 });

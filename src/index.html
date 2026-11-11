@@ -28,6 +28,7 @@
     <meta name="twitter:image:alt" content="{{META_DESCRIPTION}}">
     <link rel="stylesheet" href="./styles.css">
     <script type="module" src="./app.js"></script>
+    <script type="module" src="./incidents.js"></script>
     <script type="module" src="./road.js"></script>
   </head>
   <body>
@@ -40,6 +41,8 @@
               <p class="st-number" id="current-count">{{COUNT}}</p>
               <p class="st-comparison" id="comparison">{{COMPARISON}}</p>
               <p class="st-data-notice" id="data-notice" role="status">{{DATA_NOTICE}}</p>
+              <button class="st-incidents-open" id="incidents-open" type="button" aria-haspopup="dialog" aria-controls="incidents-dialog" disabled>Виж всички аварии и ремонти</button>
+              <noscript><p class="st-data-notice">За пълния списък отвори <a href="https://toplo.bg/accidents-and-maintenance">сайта на Топлофикация</a>.</p></noscript>
             </div>
           </section>
           <section class="st-timeline" aria-labelledby="timeline-heading">
@@ -72,7 +75,42 @@
         </section>
         <span class="st-announcement" role="status" aria-live="polite"></span>
       </div>
+      <dialog class="st-incidents-dialog" id="incidents-dialog" aria-labelledby="incidents-heading" aria-describedby="incidents-description">
+        <div class="st-incidents-header">
+          <div>
+            <h2 id="incidents-heading">Всички аварии и ремонти</h2>
+            <time class="st-incidents-observed" id="incidents-observed"></time>
+          </div>
+          <button class="st-incidents-close" id="incidents-close" type="button" autofocus>Затвори</button>
+        </div>
+        <div class="st-incidents-body">
+          <p class="st-incidents-description" id="incidents-description">Записите още са в сайта на Топлофикация. Възрастта е по обявеното начало. Сравняваме текущия срок с първия, който сме запазили.</p>
+          <div class="st-incidents-controls">
+            <label for="incidents-sort">Подреди по
+              <select id="incidents-sort">
+                <option value="oldest">Най-отдавна обявени</option>
+                <option value="longest-extension">Най-голямо удължаване на срока</option>
+                <option value="newest">Най-скоро обявени</option>
+                <option value="earliest-estimate">Най-ранен срок</option>
+              </select>
+            </label>
+            <label for="incidents-type">Покажи
+              <select id="incidents-type">
+                <option value="all">Аварии и ремонти</option>
+                <option value="accident">Само аварии</option>
+                <option value="repair">Само ремонти</option>
+              </select>
+            </label>
+          </div>
+          <p class="st-incidents-summary" id="incidents-summary" aria-live="polite"></p>
+          <p class="st-incidents-notice" id="incidents-notice" role="status"></p>
+          <p class="st-incidents-empty" id="incidents-empty" hidden></p>
+          <ol class="st-incidents-list" id="incidents-list"></ol>
+          <p class="st-incidents-source"><a href="https://toplo.bg/accidents-and-maintenance" target="_blank" rel="noopener noreferrer">Виж списъка на Топлофикация</a></p>
+        </div>
+      </dialog>
     </div>
     <script id="initial-timeline" type="application/json">{{INITIAL_DATA}}</script>
+    <script id="initial-incidents" type="application/json">{{INITIAL_INCIDENTS}}</script>
   </body>
 </html>

@@ -1,0 +1,51 @@
+{
+  "sourceType": "toplo-bg",
+  "locality": "bg.sofia",
+  "sourceUrl": "https://toplo.bg/accidents-and-maintenance",
+  "observedAt": "2026-11-11T15:00:00.000Z",
+  "count": 3,
+  "incidents": [
+    {
+      "id": "oldest",
+      "accidentId": "oldest-accident",
+      "name": "Част от Яворов",
+      "addresses": "ул. „Цар Иван Асен II“ №42",
+      "type": "accident",
+      "status": 1,
+      "reportedStart": "2025-11-04T15:00:00Z",
+      "estimatedEnd": "2026-11-15T20:00:00Z",
+      "createdAt": "2025-11-04T13:20:00Z",
+      "firstObservedAt": "2026-02-06T19:01:00.000Z",
+      "firstReportedStart": "2025-11-04T15:00:00.000Z",
+      "firstEstimatedEnd": "2026-02-27T20:00:00.000Z"
+    },
+    {
+      "id": "newer",
+      "accidentId": "newer-accident",
+      "name": "Част от Младост 1",
+      "addresses": "бл. 1, 2А, 7, 8, 9, 11",
+      "type": "accident",
+      "status": 1,
+      "reportedStart": "2026-11-11T10:25:00Z",
+      "estimatedEnd": "2026-11-13T10:25:00Z",
+      "createdAt": "2026-11-11T08:00:00Z",
+      "firstObservedAt": "2026-11-11T08:30:00.000Z",
+      "firstReportedStart": "2026-11-11T10:25:00.000Z",
+      "firstEstimatedEnd": "2026-11-13T10:25:00.000Z"
+    },
+    {
+      "id": "repair",
+      "accidentId": "repair-accident",
+      "name": "Част от Изток",
+      "addresses": "ул. „Тинтява“ №5",
+      "type": "repair",
+      "status": 1,
+      "reportedStart": "2026-11-10T13:30:00Z",
+      "estimatedEnd": "2026-11-23T23:59:00Z",
+      "createdAt": "2026-09-17T06:27:00Z",
+      "firstObservedAt": "2026-09-17T06:31:00.000Z",
+      "firstReportedStart": "2026-09-17T09:15:00.000Z",
+      "firstEstimatedEnd": "2026-09-19T09:15:00.000Z"
+    }
+  ]
+}

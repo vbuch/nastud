@@ -112,11 +112,212 @@
     line-height: 1.35;
     color: var(--st-muted);
   }
+  #counter-app .st-incidents-open {
+    margin-top: 8px;
+    padding: 6px 10px;
+    max-width: 100%;
+    border: 1px solid var(--st-cover-edge);
+    border-radius: 5px;
+    background: transparent;
+    color: var(--st-link);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.3;
+    text-wrap: balance;
+  }
+  #counter-app .st-incidents-open:hover,
+  #counter-app .st-incidents-close:hover {
+    background: var(--st-cover-groove);
+  }
+  #counter-app .st-incidents-open:disabled {
+    opacity: 0.55;
+  }
+  #counter-app .st-incidents-dialog {
+    width: min(960px, calc(100% - 32px));
+    max-width: none;
+    max-height: calc(100svh - 32px);
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--st-cover-edge);
+    border-radius: 10px;
+    background: var(--st-paper);
+    color: var(--st-ink);
+    font: inherit;
+    overflow: hidden;
+  }
+  #counter-app .st-incidents-dialog[open] {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  #counter-app .st-incidents-dialog::backdrop {
+    background: color-mix(in srgb, var(--st-hole) 82%, transparent);
+  }
+  #counter-app .st-incidents-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--st-cover-groove);
+  }
+  #counter-app .st-incidents-header > div {
+    min-width: 0;
+  }
+  #counter-app .st-incidents-header h2 {
+    margin: 0 0 5px;
+    font-size: clamp(19px, 3vw, 25px);
+    line-height: 1.2;
+    font-weight: 500;
+  }
+  #counter-app .st-incidents-observed {
+    display: block;
+    color: var(--st-muted);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  #counter-app .st-incidents-close {
+    flex-shrink: 0;
+    min-height: 36px;
+    padding: 7px 11px;
+    border: 1px solid var(--st-cover-edge);
+    border-radius: 5px;
+    background: transparent;
+    color: var(--st-ink);
+    font: inherit;
+    font-size: 14px;
+  }
+  #counter-app .st-incidents-body {
+    min-height: 0;
+    padding: 18px 24px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-color: var(--st-cover-edge) var(--st-paper);
+  }
+  #counter-app .st-incidents-description {
+    margin: 0 0 18px;
+    max-width: 72ch;
+    color: var(--st-muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  #counter-app .st-incidents-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 18px;
+    margin-bottom: 16px;
+  }
+  #counter-app .st-incidents-controls label {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    font-size: 13px;
+    color: var(--st-muted);
+  }
+  #counter-app .st-incidents-controls select {
+    min-width: 0;
+    max-width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--st-cover-edge);
+    border-radius: 5px;
+    background: var(--st-road);
+    color: var(--st-ink);
+    font: inherit;
+    font-size: 15px;
+  }
+  #counter-app .st-incidents-summary,
+  #counter-app .st-incidents-notice,
+  #counter-app .st-incidents-empty {
+    margin: 8px 0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  #counter-app .st-incidents-notice {
+    color: var(--st-link);
+  }
+  #counter-app .st-incidents-notice:empty {
+    display: none;
+  }
+  #counter-app .st-incidents-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  #counter-app .st-incident {
+    padding: 22px 0;
+    border-bottom: 1px solid var(--st-cover-groove);
+  }
+  #counter-app .st-incident-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px 14px;
+  }
+  #counter-app .st-incident-heading h3 {
+    margin: 0;
+    font-size: 19px;
+    line-height: 1.3;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+  #counter-app .st-incident-type {
+    color: var(--st-muted);
+    font-size: 12px;
+  }
+  #counter-app .st-incident-addresses {
+    margin: 6px 0;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  #counter-app .st-incident-age {
+    margin: 9px 0;
+    color: var(--st-link);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  #counter-app .st-incident-dates {
+    display: grid;
+    grid-template-columns: minmax(130px, 0.5fr) minmax(0, 1fr);
+    gap: 5px 16px;
+    margin: 14px 0;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  #counter-app .st-incident-dates dt {
+    color: var(--st-muted);
+  }
+  #counter-app .st-incident-dates dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  #counter-app .st-incident-extension,
+  #counter-app .st-incident-flag {
+    margin: 7px 0;
+    color: var(--st-link);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  #counter-app .st-incident-first-capture {
+    margin: 10px 0 0;
+    color: var(--st-muted);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  #counter-app .st-incidents-source {
+    margin: 18px 0 0;
+    font-size: 13px;
+  }
+  #counter-app .st-incidents-source a {
+    color: var(--st-link);
+    text-underline-offset: 3px;
+  }
   #counter-app .st-content {
     min-width: 0;
     min-height: 0;
     display: grid;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 0.95fr);
+    grid-template-rows: minmax(0, 1.15fr) minmax(0, 0.95fr);
     gap: 8px;
     padding-inline: clamp(14px, 4vw, 70px);
     padding-block: clamp(8px, 2svh, 28px);
@@ -428,6 +629,31 @@
     clip-path: inset(50%);
   }
   @media (max-width: 480px) {
+    #counter-app .st-incidents-dialog {
+      width: calc(100% - 16px);
+      max-height: calc(100svh - 16px);
+    }
+    #counter-app .st-incidents-header {
+      padding: 16px 14px;
+    }
+    #counter-app .st-incidents-body {
+      padding: 16px 14px;
+    }
+    #counter-app .st-incidents-controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+    }
+    #counter-app .st-incidents-controls select {
+      width: 100%;
+      font-size: 16px;
+    }
+    #counter-app .st-incident-dates {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 3px;
+    }
+    #counter-app .st-incident-dates dd + dt {
+      margin-top: 7px;
+    }
     #counter-app .st-content {
       padding-inline: 14px;
     }
@@ -468,6 +694,11 @@
     #counter-app .st-comparison,
     #counter-app .st-data-notice {
       margin-top: 4px;
+      font-size: 11px;
+    }
+    #counter-app .st-incidents-open {
+      margin-top: 5px;
+      padding: 4px 7px;
       font-size: 11px;
     }
     #counter-app .st-timeline-heading h2,
