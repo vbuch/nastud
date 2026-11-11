@@ -1,0 +1,84 @@
+name: Test and publish Na Stud
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nastud-pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Test the site
+        run: pnpm test
+      - name: Build fixture preview
+        run: node build.mjs --data test/fixtures/timeline.json --incidents test/fixtures/incidents.json
+      - name: Save reviewable preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: nastud-preview
+          path: dist
+
+  build:
+    if: github.event_name != 'pull_request' && vars.PUBLISH_ENABLED == 'true'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build current site and share images
+        env:
+          COUNTER_TIMELINE_URL: ${{ vars.COUNTER_TIMELINE_URL }}
+          COUNTER_API_KEY: ${{ secrets.COUNTER_API_KEY }}
+        run: node build.mjs --fetch --require-current
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload production site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy site
+        id: deployment
+        uses: actions/deploy-pages@v4

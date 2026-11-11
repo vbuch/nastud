@@ -1,2 +1,8 @@
 dist/
 tmp/
+node_modules/
+coverage/
+.env*
+!.env.example
+*.log
+.DS_Store

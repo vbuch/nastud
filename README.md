@@ -1,129 +1,65 @@
-# Na Stud counter
+# На студ
 
-The standalone page for `nastud.site` shows the current number of accidents and
-repairs on Toplo's website, the change from the previous daily closing count,
-an interactive daily timeline, and a complete sortable incident list behind
-"Виж всички аварии и ремонти". The road animation is independent of the source
-counts.
+[nastud.site](https://nastud.site/) shows the accidents and repairs currently
+listed by Toplofikatsia Sofia. It combines a large counter, daily history, a
+sortable incident list and an interactive road with manhole covers.
 
-The frontend is plain HTML, CSS and JavaScript. GitHub Pages hosts only the
-generated `dist/` directory. The API key is used during the build and stays in
-GitHub Actions secrets.
+OboApp supplies the data through its public API. This repository owns the
+website, product specification, tests and publication workflow.
 
-## Data flow
+## Documentation
 
-1. The existing Toplo crawler records a complete listing snapshot on each run,
-   including each incident's identity, reported start and estimated completion.
-2. `source-daily-counts` records the latest successful observation for a Sofia
-   calendar day. The scheduled job runs at 23:00 in `Europe/Sofia`.
-3. `GET /v1/sources/toplo-bg/timeline?days=366` returns the current snapshot,
-   daily counts and comparison. It uses normal API key authentication.
-4. `GET /v1/sources/toplo-bg/incidents` adds the first saved source observation
-   and its estimate to every currently listed entry.
-5. The Pages workflow fetches both endpoints at minutes 7 and 37, then publishes
-   the HTML, `timeline.json`, `incidents.json` and social images together. The
-   page refreshes the JSON while open. The list's count and source-check time
-   are also used for the counter so both describe the same observation.
+- [Product specification](docs/product-spec.md): the website's behavior and design.
+- [API expectations](docs/api-contract.md): the data the website consumes.
+- [Operations](docs/operations.md): configuration, publication and recovery.
+- [Agent instructions](AGENTS.md): development and review conventions.
 
-The list sorts by reported age, net extension of the completion estimate,
-newest reported start, or earliest current estimate. It can show all entries,
-only accidents, or only repairs. Missing first estimates stay unavailable.
-"First recorded estimate" means the estimate in OboApp's first saved source
-record. Earlier promises and intermediate revisions may be unavailable.
-Changed start dates are flagged because an incident ID identifies a website
-record and does not establish an uninterrupted outage.
+## Development
 
-The Toplo crawl keeps its existing daytime schedule: every 30 minutes from
-07:00 through 22:30 in `Europe/Sofia`. Overnight, the page preserves the last
-successful source-check time. The nightly 23:00 job records that day's latest
-observation for the daily timeline.
-
-Daily records have no automatic expiry. The API accepts 1 through 366 days per
-request. Historical dates without observations remain gaps.
-
-`data/historical-daily-counts.json` contains recovered closing counts from
-11 October through 9 November 2026. These 30 records have already been imported
-into the production database. The file remains a one-time import archive.
-Every production build uses only the API response for the current count and
-daily history, then derives the comparison from those daily records. See
-`data/README.md` for the source and selection rules.
-
-Each night adds that day's closing count to the database. On the following
-day, the API includes it in the timeline and uses it as the comparison
-baseline. The next Pages build publishes the updated data automatically.
-No JSON file needs editing.
-
-The current source check time is always preserved. Older data shows an explicit
-date and a stale-data notice. A missing baseline omits the comparison. A failed
-fetch or invalid response fails publication, keeping the previous site live.
-
-## Local development
+Use Node.js 22 and pnpm 10.11.0.
 
 ```sh
-pnpm --dir counter --ignore-workspace install --frozen-lockfile
-pnpm --dir counter test
-node counter/build.mjs --data counter/test/fixtures/timeline.json --incidents counter/test/fixtures/incidents.json
-pnpm --dir counter dev
+pnpm install --frozen-lockfile
+pnpm test
+node build.mjs --data test/fixtures/timeline.json --incidents test/fixtures/incidents.json
+pnpm dev
 ```
 
-The fixture is for local testing. To build from the real API, set
-`COUNTER_TIMELINE_URL` and `COUNTER_API_KEY`, then run:
+The development server serves `dist/` at `http://127.0.0.1:4173`. Fixture builds
+contain sample observations. Rebuild after source changes and reload the page.
+
+The frontend uses plain HTML, CSS and JavaScript. `build.mjs` generates the
+initial page, public JSON files, social images and static hosting files.
+`assets/` includes Sofia Sans and its OFL license.
+
+For a build with current data, supply `COUNTER_TIMELINE_URL` and
+`COUNTER_API_KEY` through the process environment, then run:
 
 ```sh
-node counter/build.mjs --fetch --require-current
+node build.mjs --fetch --require-current
 ```
 
-The default public URL is `https://nastud.site/`. The build supports
-`--site-url <https-url>` and `--out <directory>` for other deployments.
+Keep the key in a local secret store or GitHub Actions secret. Generated site
+files contain public observations only. Never commit a real key.
 
-## Deployment
+## Publication
 
-Deploy the new backend, database indexes and Terraform nightly job first.
-The incident-list endpoint needs one successful crawl with incident details;
-legacy count-only snapshots remain valid for the counter and daily history.
-Production publication fails if either API read is unavailable or invalid,
-preserving the last successful page.
-The production database already contains the recovered history. For a new
-database, import it once through the database abstraction:
+[GitHub Actions](https://github.com/vbuch/nastud/actions/workflows/pages.yml)
+builds and publishes the website through GitHub Pages. Main-branch changes,
+manual dispatches and the schedule at minutes 7 and 37 can publish. Pull
+requests test and build fixture previews.
 
-```sh
-cd ingest
-pnpm exec tsx source-daily-counts.ts --import ../counter/data/historical-daily-counts.json
-```
+Production publishing is enabled with the `PUBLISH_ENABLED` repository variable
+after the API secret and hosting configuration are ready.
 
-This validates every imported record before writing. Repeat imports update the
-same source/date records. Run it with the production locality and database
-configuration loaded from `ingest/.env.local`.
+A failed API read or invalid response stops publication and leaves the previous
+successful site available. The page preserves the source's observation time.
+See [operations](docs/operations.md) for the full release procedure.
 
-In the `vbuch/oboapp` repository, configure:
+## Source history
 
-- Variable `COUNTER_TIMELINE_URL`: the deployed API's full timeline endpoint,
-  for example `https://<api-host>/v1/sources/toplo-bg/timeline?days=366`.
-- Secret `COUNTER_API_KEY`: a dedicated valid OboApp API key.
-- Settings > Pages > Build and deployment: GitHub Actions.
-- Settings > Pages > Custom domain: `nastud.site`.
-
-The Pages custom-domain setting is required for an Actions deployment. The
-generated `CNAME` file alone does not configure the repository's domain.
-The workflow runs only in `vbuch/oboapp`; pull requests build test artifacts and
-do not deploy. Production publishing requires a valid current observation.
-
-For the apex domain, add four A records at `@` with GitHub's addresses:
-`185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
-An optional `www` CNAME points to `vbuch.github.io`. Configure the custom domain
-in GitHub before pointing DNS there. Enable Enforce HTTPS after the certificate
-is ready. See
-[GitHub's custom-domain instructions](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
-
-## Sharing
-
-The build places Open Graph and Twitter metadata in the initial HTML and
-renders PNG cards at 1200 by 630 and 1200 by 1200. Cards use the bundled,
-OFL-licensed Sofia Sans font for consistent Bulgarian glyphs. The source check
-time appears on the card.
-
-Share-image URLs use the stable `share.png` path with a version query. Previously
-published URLs remain valid after the next build. Social titles stay descriptive
-while the image contains the observed count. Social platforms can retain their
-own cached previews; public crawler validation requires the domain and HTTPS to
-be active.
+The website was extracted from `counter/` in
+[`vbuch/oboapp`](https://github.com/vbuch/oboapp) at commit
+[`ead7ffc68fc1411582a85045c2bf15a96a1ca648`](https://github.com/vbuch/oboapp/commit/ead7ffc68fc1411582a85045c2bf15a96a1ca648).
+The extraction uses Git subtree history. OboApp retains the crawlers, snapshots,
+daily recording, historical import archive and API implementation.
