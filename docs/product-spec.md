@@ -18,7 +18,9 @@ deadline extensions.
 ## Daily history and comparison
 
 - Display a full-width daily timeline beneath the counter.
+- Start the displayed period at the earlier of 29 October 2026 and one calendar month before today's date in `Europe/Sofia`. When the previous month has fewer days, use its last day. End the period at the latest observation.
 - Plot daily observations in calendar order with proportional spacing. Keep missing dates as gaps.
+- Show only observations within the displayed period. Keep earlier supplied observations available for daily comparisons, and leave any period before the first available observation blank.
 - Include the latest observation for its Sofia calendar day. When a stored daily point shares that date, use the newer observation for the plotted point.
 - Let pointer, touch and keyboard interaction select a point and show its date, source-check time and count.
 - Compare the current count with the previous Sofia calendar day's closing count. Derive the baseline from the API's daily records.
@@ -26,7 +28,13 @@ deadline extensions.
 - A missing historical date remains unknown. The website does not maintain or backfill its own source history.
 - Use the legend labels “Аварии и ремонти” and “Температура”, with the selected day's date and values. Omit the extra chart heading, scale-direction wording and repeated date-range caption. The date axis shows the period.
 - Give the graph most of the timeline space. Use a compact readout with the incident count at the left, temperature at the right and date between them. On phones and short landscape screens, center the date above the values and show the count's “бр.” unit with the line swatches. Keep full metric labels accessible. Use modest value sizes, matching the line colors, and only the arrow and amount for daily change. Keep the readout height stable when values are missing.
-- Beside the selected incident count, show the change from the previous calendar day as `↑ 2`, `↓ 2` or `→ 0`. Compare against that day's closing count using the plotted observations. Omit the change when the preceding calendar day is missing. Describe the direction and amount in the chart's accessible label.
+- Beside the selected incident count, show the change from the previous calendar day as `↑ 2`, `↓ 2` or `→ 0`. Compare against that day's closing count using the supplied observations, including a preceding day outside the displayed period. Omit the change when the preceding calendar day is missing. Describe the direction and amount in the chart's accessible label.
+
+### Heating season milestone
+
+- Mark 29 October 2026 as the start of the phased heating rollout for the 2026/2027 season in Sofia. Use the event date from [Toplofikatsia Sofia's announcement](https://toplo.bg/heating_season2627), published on 28 October 2026.
+- Show a compact chart annotation with the date, a Bulgarian label describing the phased start and a link to the announcement. Keep it readable and accessible by keyboard on desktop and phones.
+- Position the marker by its Sofia calendar date within the displayed period. Keep it visible when available incident observations start after 29 October 2026. A missing observation on the milestone date remains unknown.
 
 ### Outside temperature
 
@@ -34,7 +42,7 @@ deadline extensions.
 - Use Open-Meteo's ECMWF IFS historical model at Sofia city coordinates `42.6977, 23.3219`. Explain the calculated daily model averages in the footer's weather details.
 - Calculate averages from hourly temperatures at two metres above ground, grouped into `Europe/Sofia` calendar days. Require every hour in the local day, including 23-hour and 25-hour days at daylight saving changes.
 - Fetch temperature history during publication for up to the latest 366 calendar days of the incident timeline, ending at yesterday in Sofia. Keep today's unfinished daily mean unknown, even if the provider returns populated forecast hours. Leave missing and incomplete days unknown, and break the temperature line at gaps. Never move a temperature onto another date.
-- Keep the incident date range and incident gaps unchanged. Selecting a day shows its incident count and temperature, or a clear missing-temperature label. Support the same pointer, touch and keyboard controls for both series.
+- Use the same displayed date range for incidents and temperatures, and preserve incident gaps. Selecting a day shows its incident count and temperature, or a clear missing-temperature label. Support the same pointer, touch and keyboard controls for both series.
 - Add Open-Meteo and a CC BY 4.0 licence link to the bottom credit alongside OboApp. Selecting Open-Meteo opens a small disclosure about daily averages, the ECMWF IFS model and a provider link. A hover hint points to these details. Support touch and keyboard activation; Escape closes the details and keeps focus on the label.
 - A weather request failure leaves the incident chart available. Explain unavailability in the footer details and keep missing values explicit when selecting a chart day. Browser refreshes read only the site's bundled public timeline JSON.
 - The overlay supports visual comparison of listed accidents and repairs with temperature. The count includes active listed records, so this view does not establish the number of new incidents or a causal relationship.

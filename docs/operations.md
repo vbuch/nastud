@@ -90,6 +90,35 @@ After publication, inspect the `weather` metadata and date range in
 then today's incident point to check the missing-temperature label. Confirm that a weather failure
 leaves the counter and incident list usable.
 
+## Heating season milestone
+
+The chart marks 29 October 2026, when Toplofikatsia Sofia began the phased
+heating rollout for the 2026/2027 season. The [source announcement](https://toplo.bg/heating_season2627)
+was published on 28 October 2026. It schedules schools and kindergartens first,
+followed by residential and administrative buildings. Keep the marker on the
+event date rather than the announcement's publication date.
+
+This milestone is maintained in the website source. For a correction or another
+season, verify the provider's announcement, record its link and distinguish the
+announced event date from the publication date. Update the product specification
+and relevant regression checks in the same change, then rebuild the site.
+
+The displayed period starts at the earlier of 29 October 2026 and one calendar
+month before today's date in `Europe/Sofia`. Clamp the day to the last day of
+the previous month when needed. The right edge follows the latest observation.
+Earlier supplied observations remain in the public data and can provide the
+preceding calendar day's count for a comparison at the left edge. Missing dates
+in the displayed period stay blank. The website does not backfill source history.
+
+Check timelines with observations before and after the start of the displayed
+period, including one whose first observation is after 29 October 2026. Confirm
+the exact left-edge date, visible milestone, readable Bulgarian label and source
+link. Check the month-end calculation and Sofia's calendar-day boundary. A missing
+incident observation on the milestone date must remain a gap. Verify a daily
+comparison against an available preceding day outside the displayed period.
+Verify the source link with a keyboard and inspect the annotation at desktop
+width, 320px phone width and phone landscape.
+
 ## Routine release
 
 1. Update the relevant specification when intended behavior changes.

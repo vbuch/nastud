@@ -3,6 +3,15 @@ import { normalizeWeather } from "./weather.js";
 const SOFIA_TIME_ZONE = "Europe/Sofia";
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+const HEATING_SEASON_START = "2026-10-29";
+const TIMELINE_MILESTONES = [
+  {
+    date: HEATING_SEASON_START,
+    label: "Поетапно пускане на отоплението",
+    sourceUrl: "https://toplo.bg/heating_season2627",
+    announcedOn: "2026-10-28",
+  },
+];
 
 const dayPartsFormatter = new Intl.DateTimeFormat("en", {
   timeZone: SOFIA_TIME_ZONE,
@@ -163,14 +172,38 @@ export function getTimelinePoints(data) {
   });
 }
 
-export function getWeatherPoints(weather, incidentPoints) {
+export function getTimelineRange(points, now = new Date()) {
+  if (points.length === 0) {
+    return null;
+  }
+  const today = getSofiaDateKey(now);
+  const monthStart = new Date(today.slice(0, 7) + "-01T12:00:00Z");
+  const previousMonthEnd = new Date(monthStart.getTime() - DAY_MILLISECONDS);
+  const previousMonthDay = Math.min(Number(today.slice(8, 10)), previousMonthEnd.getUTCDate());
+  const monthAgo = previousMonthEnd.toISOString().slice(0, 8) + String(previousMonthDay).padStart(2, "0");
+  const start = monthAgo < HEATING_SEASON_START ? monthAgo : HEATING_SEASON_START;
+  const end = points[points.length - 1].date;
+  return end >= start ? { start, end } : null;
+}
+
+export function getWeatherPoints(weather, incidentPoints, range = null) {
   if (!weather || incidentPoints.length === 0) {
     return [];
   }
-  const first = incidentPoints[0].date;
-  const last = incidentPoints[incidentPoints.length - 1].date;
+  const first = range?.start ?? incidentPoints[0].date;
+  const last = range?.end ?? incidentPoints[incidentPoints.length - 1].date;
   return weather.daily.filter((point) => {
     return point.date >= first && point.date <= last;
+  });
+}
+
+export function getTimelineMilestones(points, now = new Date()) {
+  const range = getTimelineRange(points, now);
+  if (!range) {
+    return [];
+  }
+  return TIMELINE_MILESTONES.filter((milestone) => {
+    return milestone.date >= range.start && milestone.date <= range.end;
   });
 }
 
@@ -291,6 +324,7 @@ export function startCounter() {
   const chart = root.querySelector("#timeline-chart");
   const svg = root.querySelector("#timeline-svg");
   const chartButton = root.querySelector("#timeline-interaction");
+  const milestoneLabels = root.querySelector("#timeline-milestones");
   const empty = root.querySelector("#timeline-empty");
   const selectedLabel = root.querySelector("#timeline-selected");
   const selectedDay = root.querySelector("#timeline-selected-date");
@@ -306,6 +340,7 @@ export function startCounter() {
   let points = [];
   let plotted = [];
   let selectedDate = null;
+  let rangeDate = null;
   let cursor = null;
   let focusDot = null;
   let weatherFocusDot = null;
@@ -362,40 +397,82 @@ export function startCounter() {
   }
 
   function drawTimeline() {
+    const focusedSource = milestoneLabels.contains(document.activeElement) ? document.activeElement.href : null;
     svg.replaceChildren();
+    milestoneLabels.replaceChildren();
     cursor = null;
     focusDot = null;
     weatherFocusDot = null;
     plotted = [];
     weatherPlotted = [];
-    empty.hidden = points.length > 0;
-    chartButton.disabled = points.length === 0;
-    selectedLabel.hidden = points.length === 0;
-    const weatherPoints = getWeatherPoints(data?.weather, points);
+    const now = new Date();
+    rangeDate = getSofiaDateKey(now);
+    const range = getTimelineRange(points, now);
+    const milestones = getTimelineMilestones(points, now);
+    chart.classList.toggle("st-chart-has-milestone", milestones.length > 0);
+    const visiblePoints = range ? points.filter((point) => {
+      return point.date >= range.start && point.date <= range.end;
+    }) : [];
+    empty.hidden = visiblePoints.length > 0;
+    chartButton.disabled = visiblePoints.length === 0;
+    selectedLabel.hidden = visiblePoints.length === 0;
+    const weatherPoints = getWeatherPoints(data?.weather, visiblePoints, range);
     const temperatureAxis = makeTemperatureAxis(weatherPoints);
     weatherLegend.hidden = !data?.weather;
     weatherNotice.textContent = temperatureAxis
       ? "Средна дневна температура за София."
       : "В момента няма температури за показания период.";
 
-    if (points.length === 0) {
+    if (visiblePoints.length === 0) {
       svg.setAttribute("aria-label", "Няма налични данни за графиката");
       return;
     }
 
     const width = Math.max(240, chart.clientWidth);
     const height = Math.max(72, chart.clientHeight);
-    const axis = makeYAxis(points);
+    const axis = makeYAxis(visiblePoints);
     const left = Math.max(34, String(axis.high).length * 7 + 12);
     const right = temperatureAxis ? 49 : 14;
-    const top = 15;
     const bottom = height - 29;
     const plotWidth = Math.max(60, width - left - right);
-    const firstTime = Date.parse(points[0].date + "T12:00:00Z");
-    const lastTime = Date.parse(points[points.length - 1].date + "T12:00:00Z");
+    const firstTime = Date.parse(range.start + "T12:00:00Z");
+    const lastTime = Date.parse(range.end + "T12:00:00Z");
     const timeSpan = lastTime - firstTime;
+    let focusedMilestone = null;
+    let top = 15;
+    for (const milestone of milestones) {
+      const timestamp = Date.parse(milestone.date + "T12:00:00Z");
+      const x = timeSpan === 0 ? left + plotWidth / 2 : left + (timestamp - firstTime) / timeSpan * plotWidth;
+      const link = document.createElement("a");
+      link.className = "st-chart-milestone";
+      link.href = milestone.sourceUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = formatCalendarDate(milestone.date) + " · " + milestone.label;
+      link.title = "Съобщение на Топлофикация от " + formatCalendarDate(milestone.announcedOn);
+      milestoneLabels.append(link);
+      if (link.href === focusedSource) {
+        focusedMilestone = link;
+      }
+      link.style.left = Math.max(6, Math.min(x, width - link.offsetWidth - 6)) + "px";
+      top = Math.max(top, link.offsetHeight + 10);
+      svg.append(svgElement("line", {
+        class: "st-chart-milestone-line",
+        x1: x,
+        x2: x,
+        y1: link.offsetHeight + 4,
+        y2: bottom,
+      }));
+      svg.append(svgElement("path", {
+        class: "st-chart-milestone-cap",
+        d: "M" + x + "," + (top - 3) + " l4,4 l-4,4 l-4,-4 Z",
+      }));
+    }
     svg.setAttribute("viewBox", "0 0 " + width + " " + height);
-    svg.setAttribute("aria-label", "Брой аварии и ремонти" + (temperatureAxis ? " и средна температура в София" : "") + " от " + formatCalendarDate(points[0].date) + " до " + formatCalendarDate(points[points.length - 1].date));
+    const milestoneDescription = milestones.map((milestone) => {
+      return " " + formatCalendarDate(milestone.date) + ": " + milestone.label + ".";
+    }).join("");
+    svg.setAttribute("aria-label", "Брой аварии и ремонти" + (temperatureAxis ? " и средна температура в София" : "") + " от " + formatCalendarDate(range.start) + " до " + formatCalendarDate(range.end) + "." + milestoneDescription);
 
     const visibleTicks = axis.ticks.filter((tick, index) => {
       if (height >= 180) {
@@ -444,7 +521,7 @@ export function startCounter() {
       }
     }
 
-    plotted = points.map((point) => {
+    plotted = visiblePoints.map((point) => {
       const timestamp = Date.parse(point.date + "T12:00:00Z");
       return {
         ...point,
@@ -465,7 +542,7 @@ export function startCounter() {
       }));
     }
 
-    const labelCount = points.length === 1 ? 1 : width < 480 ? 3 : 5;
+    const labelCount = timeSpan === 0 ? 1 : width < 480 ? 3 : 5;
     const labels = new Set();
     for (let index = 0; index < labelCount; index++) {
       const fraction = labelCount === 1 ? 0.5 : index / (labelCount - 1);
@@ -491,6 +568,7 @@ export function startCounter() {
       return point.date === selectedDate;
     });
     selectPoint(selection < 0 ? plotted.length - 1 : selection);
+    focusedMilestone?.focus({ preventScroll: true });
   }
 
   function updatePresentation() {
@@ -498,6 +576,9 @@ export function startCounter() {
     observedLabel.dateTime = data?.current?.observedAt ?? "";
     comparison.textContent = formatComparisonText(data?.comparison, data?.current);
     notice.textContent = getDataNotice(data?.current);
+    if (rangeDate !== getSofiaDateKey(new Date())) {
+      drawTimeline();
+    }
   }
 
   function acceptData(value) {

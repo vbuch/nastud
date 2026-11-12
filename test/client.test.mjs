@@ -7,7 +7,9 @@ import {
   formatTemperature,
   getDataNotice,
   getDailyChange,
+  getTimelineMilestones,
   getTimelinePoints,
+  getTimelineRange,
   getWeatherPoints,
   makeTemperatureAxis,
   makeTimelinePath,
@@ -76,6 +78,136 @@ test("uses the newer observation when today's live count shares a daily date", (
   assert.equal(points[0].isCurrent, true);
 });
 
+test("marks the phased heating rollout on its event date with the original announcement source", () => {
+  const points = [{ date: "2026-10-28" }, { date: "2026-10-30" }];
+  assert.deepEqual(getTimelineMilestones(points, new Date("2026-11-12T12:00:00Z")), [{
+    date: "2026-10-29",
+    label: "Поетапно пускане на отоплението",
+    sourceUrl: "https://toplo.bg/heating_season2627",
+    announcedOn: "2026-10-28",
+  }]);
+});
+
+test("includes a heating milestone on either timeline boundary and on a single event day", () => {
+  for (const dates of [
+    ["2026-10-29", "2026-11-01"],
+    ["2026-10-27", "2026-10-29"],
+    ["2026-10-29"],
+  ]) {
+    const points = dates.map((date) => {
+      return { date };
+    });
+    assert.deepEqual(getTimelineMilestones(points, new Date("2026-11-29T12:00:00Z")).map((milestone) => {
+      return milestone.date;
+    }), ["2026-10-29"]);
+  }
+});
+
+test("omits the heating milestone for empty history and observations ending before the event", () => {
+  for (const dates of [
+    [],
+    ["2026-10-27", "2026-10-28"],
+    ["2025-10-29"],
+  ]) {
+    const points = dates.map((date) => {
+      return { date };
+    });
+    assert.deepEqual(getTimelineMilestones(points, new Date("2026-10-28T12:00:00Z")), []);
+  }
+});
+
+test("keeps the heating milestone visible when every observation starts after it", () => {
+  const points = [{ date: "2026-11-07" }, { date: "2026-11-09" }];
+  assert.equal(getTimelineMilestones(points, new Date("2026-12-12T12:00:00Z"))[0].date, "2026-10-29");
+});
+
+test("keeps missing incident days unknown when a milestone falls in a chart gap", () => {
+  const points = getTimelinePoints({
+    daily: [
+      { date: "2026-10-28", count: 0, observedAt: "2026-10-28T20:30:00Z" },
+      { date: "2026-10-30", count: 12, observedAt: "2026-10-30T20:30:00Z" },
+    ],
+    current: null,
+  });
+  const original = structuredClone(points);
+
+  assert.equal(getTimelineMilestones(points, new Date("2026-11-12T12:00:00Z")).length, 1);
+  assert.deepEqual(points, original);
+  assert.equal(points.length, 2);
+  assert.equal(getDailyChange(points, "2026-10-30"), null);
+});
+
+test("includes the heating milestone when the current observation reaches its Sofia calendar day", () => {
+  const points = getTimelinePoints({
+    daily: [{ date: "2026-10-28", count: 10, observedAt: "2026-10-28T20:30:00Z" }],
+    current: { count: 11, observedAt: "2026-10-28T22:07:00Z" },
+  });
+
+  assert.equal(points[1].date, "2026-10-29");
+  assert.equal(getTimelineMilestones(points, new Date("2026-10-28T22:20:00Z"))[0].date, points[1].date);
+});
+
+test("starts one calendar month ago until the heating milestone is farther away", () => {
+  for (const [today, start] of [
+    ["2026-11-12", "2026-10-12"],
+    ["2026-11-28", "2026-10-28"],
+    ["2026-11-29", "2026-10-29"],
+    ["2026-12-12", "2026-10-29"],
+    ["2027-01-12", "2026-10-29"],
+  ]) {
+    assert.deepEqual(getTimelineRange([{ date: today }], new Date(today + "T12:00:00Z")), {
+      start,
+      end: today,
+    });
+  }
+});
+
+test("clamps the previous calendar month at its final day, including leap years", () => {
+  for (const [today, start] of [
+    ["2026-03-31", "2026-02-28"],
+    ["2024-03-31", "2024-02-29"],
+    ["2026-05-31", "2026-04-30"],
+    ["2026-01-31", "2025-12-31"],
+  ]) {
+    assert.equal(getTimelineRange([{ date: today }], new Date(today + "T12:00:00Z")).start, start);
+  }
+});
+
+test("uses Sofia's calendar date at midnight and across daylight saving changes", () => {
+  for (const [now, end, start] of [
+    ["2026-11-11T22:07:00Z", "2026-11-12", "2026-10-12"],
+    ["2026-03-30T21:07:00Z", "2026-03-31", "2026-02-28"],
+    ["2026-10-24T21:07:00Z", "2026-10-25", "2026-09-25"],
+    ["2026-10-25T22:07:00Z", "2026-10-26", "2026-09-26"],
+  ]) {
+    assert.deepEqual(getTimelineRange([{ date: end }], new Date(now)), { start, end });
+  }
+});
+
+test("preserves supplied observations and prior-day comparisons outside the plotted range", () => {
+  const points = getTimelinePoints({
+    daily: [
+      { date: "2026-10-11", count: 7, observedAt: "2026-10-11T20:30:00Z" },
+      { date: "2026-10-12", count: 0, observedAt: "2026-10-12T20:30:00Z" },
+    ],
+    current: { count: 2, observedAt: "2026-11-11T20:30:00Z" },
+  });
+  const original = structuredClone(points);
+
+  assert.deepEqual(getTimelineRange(points, new Date("2026-11-12T12:00:00Z")), {
+    start: "2026-10-12",
+    end: "2026-11-11",
+  });
+  assert.deepEqual(points, original);
+  assert.equal(getDailyChange(points, "2026-10-12"), -7);
+});
+
+test("has no plotted range without observations in the requested window", () => {
+  const now = new Date("2026-11-12T12:00:00Z");
+  assert.equal(getTimelineRange([], now), null);
+  assert.equal(getTimelineRange([{ date: "2026-10-11" }], now), null);
+});
+
 test("calculates selected-day changes from the exact preceding calendar day", () => {
   const points = [
     { date: "2026-11-07", count: 0 },
@@ -131,6 +263,22 @@ test("limits temperatures to incident history while preserving missing and zero 
   assert.deepEqual(getWeatherPoints(weather, points), weather.daily.slice(1, 4));
   assert.deepEqual(getWeatherPoints(null, points), []);
   assert.deepEqual(getWeatherPoints(weather, []), []);
+});
+
+test("aligns temperatures with an explicit plot window before the first incident observation", () => {
+  const weather = {
+    daily: [
+      { date: "2026-10-28", meanC: 8 },
+      { date: "2026-10-29", meanC: 0 },
+      { date: "2026-11-07", meanC: null },
+      { date: "2026-11-09", meanC: -2 },
+      { date: "2026-11-10", meanC: 1 },
+    ],
+  };
+  const points = [{ date: "2026-11-07" }, { date: "2026-11-09" }];
+  const range = { start: "2026-10-29", end: "2026-11-09" };
+
+  assert.deepEqual(getWeatherPoints(weather, points, range), weather.daily.slice(1, 4));
 });
 
 test("temperature labels distinguish freezing and negative temperatures from missing readings", () => {
