@@ -26,7 +26,6 @@ export function startRoad() {
   ];
   const holes = [];
   let soundIndex = 0;
-  let keyboardFocus = false;
   let visible = true;
   let lastTime = null;
   let travel = 0;
@@ -55,7 +54,6 @@ export function startRoad() {
     hole.button.classList.add("st-open");
     hole.button.setAttribute("aria-label", "Шахтата е отворена");
     hole.button.disabled = true;
-    keyboardFocus = false;
     const source = hole.button.getBoundingClientRect();
     const overlay = effects.getBoundingClientRect();
     const cover = hole.button.querySelector(".st-lid").getBoundingClientRect();
@@ -114,12 +112,6 @@ export function startRoad() {
     button.addEventListener("click", () => {
       burst(hole);
     });
-    button.addEventListener("focus", () => {
-      keyboardFocus = button.matches(":focus-visible");
-    });
-    button.addEventListener("blur", () => {
-      keyboardFocus = false;
-    });
     manholeLayer.append(button);
     holes.push(hole);
     drawHole(hole);
@@ -131,6 +123,11 @@ export function startRoad() {
     }
     const seconds = lastTime === null ? 0 : Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
+    const keyboardFocus = holes.some((hole) => {
+      return document.activeElement === hole.button
+        && !hole.button.disabled
+        && hole.button.matches(":focus-visible");
+    });
 
     if (!reducedMotion.matches && !keyboardFocus && visible && !document.hidden) {
       const distance = settings.speed * seconds;

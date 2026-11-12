@@ -8,12 +8,12 @@ deadline extensions.
 ## Counter and observation time
 
 - Count all listed accidents and repairs, including records with unusable map geometry or a completion estimate that has passed.
-- Link the heading “Аварии и ремонти” to Toplo's [source listing](https://toplo.bg/accidents-and-maintenance).
+- Make “Аварии и ремонти” in the heading open the full incident dialog. Style it as the existing underlined text and keep the observation time beside it.
 - Show a prominent count and the source-check time in `Europe/Sofia`.
 - Always include the calendar date, including today: “към 00:07 на 10 ноември”. Include the year when needed to distinguish an older observation.
 - A verified count of zero displays `0`. With no current observation, display an unavailable state instead of a false zero.
 - The count and incident list in each publication use the same incident snapshot's count and `observedAt`.
-- Preserve observation time when data is old. Show a stale-data notice after 90 minutes and after a failed refresh that leaves older data visible.
+- Preserve the full observation date and time when data is old or a refresh fails. Omit the generic old-data message below the count. Keep an unavailable-data notice when there is no observation.
 
 ## Daily history and comparison
 
@@ -22,12 +22,26 @@ deadline extensions.
 - Include the latest observation for its Sofia calendar day. When a stored daily point shares that date, use the newer observation for the plotted point.
 - Let pointer, touch and keyboard interaction select a point and show its date, source-check time and count.
 - Compare the current count with the previous Sofia calendar day's closing count. Derive the baseline from the API's daily records.
-- Omit the comparison if that day's baseline is unavailable. Use an explicit reference date when “вчера” would describe the wrong day.
+- Show the comparison directly below the big count. Use “С 2 повече от вчера.” or “С 2 по-малко от вчера.” only when the displayed observation is from today in Sofia and the baseline is yesterday. Use the explicit baseline date for an older observation or another comparison day. Omit the comparison if that day's baseline is unavailable.
 - A missing historical date remains unknown. The website does not maintain or backfill its own source history.
+- Use the legend labels “Аварии и ремонти” and “Температура”, with the selected day's date and values. Omit the extra chart heading, scale-direction wording and repeated date-range caption. The date axis shows the period.
+- Give the graph most of the timeline space. Use a compact readout with the incident count at the left, temperature at the right and date between them. On phones and short landscape screens, center the date above the values and show the count's “бр.” unit with the line swatches. Keep full metric labels accessible. Use modest value sizes, matching the line colors, and only the arrow and amount for daily change. Keep the readout height stable when values are missing.
+- Beside the selected incident count, show the change from the previous calendar day as `↑ 2`, `↓ 2` or `→ 0`. Compare against that day's closing count using the plotted observations. Omit the change when the preceding calendar day is missing. Describe the direction and amount in the chart's accessible label.
+
+### Outside temperature
+
+- Overlay Sofia's daily mean outside temperature on the same dates, with a separate right-hand axis in °C. Label the incident count and temperature series clearly, using different colors and a dashed temperature line.
+- Use Open-Meteo's ECMWF IFS historical model at Sofia city coordinates `42.6977, 23.3219`. Explain the calculated daily model averages in the footer's weather details.
+- Calculate averages from hourly temperatures at two metres above ground, grouped into `Europe/Sofia` calendar days. Require every hour in the local day, including 23-hour and 25-hour days at daylight saving changes.
+- Fetch temperature history during publication for up to the latest 366 calendar days of the incident timeline, ending at yesterday in Sofia. Keep today's unfinished daily mean unknown, even if the provider returns populated forecast hours. Leave missing and incomplete days unknown, and break the temperature line at gaps. Never move a temperature onto another date.
+- Keep the incident date range and incident gaps unchanged. Selecting a day shows its incident count and temperature, or a clear missing-temperature label. Support the same pointer, touch and keyboard controls for both series.
+- Add Open-Meteo and a CC BY 4.0 licence link to the bottom credit alongside OboApp. Selecting Open-Meteo opens a small disclosure about daily averages, the ECMWF IFS model and a provider link. A hover hint points to these details. Support touch and keyboard activation; Escape closes the details and keeps focus on the label.
+- A weather request failure leaves the incident chart available. Explain unavailability in the footer details and keep missing values explicit when selecting a chart day. Browser refreshes read only the site's bundled public timeline JSON.
+- The overlay supports visual comparison of listed accidents and repairs with temperature. The count includes active listed records, so this view does not establish the number of new incidents or a causal relationship.
 
 ## Full incident list
 
-- Keep the compact main view and open the full list with “Виж всички аварии и ремонти”.
+- Keep the compact main view and open the full list from “Аварии и ремонти” in the heading. Keep the heading text stable after data refreshes. Include the Toplo source link in the dialog and the no-JavaScript fallback.
 - Use a native dialog with its own scrolling content, a visible close button and a source-check timestamp.
 - Include every record from the validated incident snapshot. Show the total and visible count.
 - Offer filters for all entries, accidents only and repairs only.
@@ -36,9 +50,10 @@ deadline extensions.
 - Use stable secondary ordering for records with equal sort values.
 - Each record shows its name, affected addresses, accident or repair type, reported age, reported start, current estimate, first recorded estimate and first capture date when available.
 - Label missing dates and baselines clearly. Do not manufacture estimates.
-- Calculate age in calendar days relative to the snapshot's Sofia date. A future reported start has age zero. Label age as “по обявеното начало”.
+- Calculate age in calendar days relative to the snapshot's Sofia date. Display “От посоченото начало: 1 ден” or the plural day count. Use “Началото е в деня на проверката.” for the same calendar day and “Посоченото начало е след датата на проверката.” for a future start. Keep the underlying future age at zero, and omit the age when the start is unknown. Explain the reference date once in the dialog.
 - Display source incident dates as source calendar dates. Their displayed clock values and `Z` suffix have unresolved timezone semantics, so the interface does not promise precise elapsed hours.
 - Describe a deadline extension as the current estimate minus the first estimate OboApp captured. That first capture can be later than the original announcement.
+- Use “Текущият срок е с 1 ден по-ранен от първия запазен срок.” or “по-късен” to identify both the direction and comparison. Use “около” only for rounded fractional days, and “по-малко от 1 ден” for smaller differences. Equal estimates “съвпадат”; do not imply that no intermediate changes happened. Distinguish a missing current completion estimate from a missing first saved estimate.
 - Flag records whose reported start changed from the first saved start. A stable website record does not establish uninterrupted loss of service.
 - Flag a current estimate whose source calendar date has passed while its record remains listed.
 - Keep records with passed estimates in the list until the provider's current listing removes them.
@@ -63,10 +78,12 @@ deadline extensions.
 - The main counter, graph and road fit in one viewport. The incident dialog supplies the longer scrollable view.
 - Support narrow 320px phones, common phone sizes, tablets, desktop widths and short landscape screens without clipping controls or text.
 - Give the bottom part of the page a tilted road with depth, moving circular manhole covers and varied positions.
+- On phone landscape screens, hide the road, manholes, steam and playful hint to give the chart more room. Keep the counter and chart side by side, and retain the source credits in a small footer. Restore the road in portrait.
 - Tapping or clicking a cover releases steam and sends the lid into the air. Cycle playful text sounds such as “ПСССТ!”, “ФШШШШ!” and “БУМ!”.
 - The road interaction does not change real counts or records. Keep the removed pause button absent.
 - Respect reduced-motion preferences and pause background motion when the page is hidden or keyboard interaction needs a stable target.
-- Keep “с данни от OboApp” faint at the bottom right, with a link to `https://oboapp.online`. It should remain available to interested visitors without competing with the counter.
+- Read the focused manhole's current `:focus-visible` state when animating, so a change between keyboard and pointer input cannot leave the road paused from a cached focus state.
+- Keep “с данни от OboApp и Open-Meteo” faint at the bottom right, with links to `https://oboapp.online` and `https://open-meteo.com/`, plus a small CC BY 4.0 licence link. Keep the credit readable on narrow phones without competing with the counter or overlapping the road hint.
 - Keep Bulgarian text neutral or use informal ти when addressing the visitor.
 
 ## Social sharing and public hosting
@@ -89,3 +106,6 @@ Browser review covers the main view, graph interaction, full-list opening,
 sorting, filtering, scrolling, close and focus behavior at desktop and phone
 widths. Release review verifies that the live list and counter share the same
 count and observation timestamp.
+
+Temperature checks cover date alignment, daylight saving changes, negative and
+zero values, incomplete days, provider failures and the independent °C axis.

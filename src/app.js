@@ -1,3 +1,5 @@
+import { normalizeWeather } from "./weather.js";
+
 const SOFIA_TIME_ZONE = "Europe/Sofia";
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
@@ -79,26 +81,20 @@ export function formatComparisonText(comparison, current, now = new Date()) {
   const today = getSofiaDateKey(now);
   const yesterday = new Date(Date.parse(today + "T12:00:00Z") - DAY_MILLISECONDS)
     .toISOString().slice(0, 10);
-  const reference = comparison.date === yesterday
+  const reference = getSofiaDateKey(current.observedAt) === today && comparison.date === yesterday
     ? "вчера"
     : formatCalendarDate(comparison.date, now);
   const change = current.count - comparison.count;
 
   if (change === 0) {
-    return "Без промяна спрямо " + reference + ".";
+    return "Без промяна от " + reference + ".";
   }
   const direction = change < 0 ? "по-малко" : "повече";
-  return "С " + Math.abs(change) + " " + direction + " спрямо " + reference + ".";
+  return "С " + Math.abs(change) + " " + direction + " от " + reference + ".";
 }
 
-export function getDataNotice(current, now = new Date()) {
-  if (!current) {
-    return "В момента няма актуални данни.";
-  }
-  if (new Date(now).getTime() - Date.parse(current.observedAt) > 90 * 60 * 1000) {
-    return "Показваме последните налични данни.";
-  }
-  return "";
+export function getDataNotice(current) {
+  return current ? "" : "В момента няма актуални данни.";
 }
 
 export function normalizeTimeline(value) {
@@ -147,6 +143,7 @@ export function normalizeTimeline(value) {
       return left.date.localeCompare(right.date);
     }),
     comparison,
+    weather: normalizeWeather(value.weather ?? null),
   };
 }
 
@@ -164,6 +161,83 @@ export function getTimelinePoints(data) {
   return [...points.values()].sort((left, right) => {
     return left.date.localeCompare(right.date);
   });
+}
+
+export function getWeatherPoints(weather, incidentPoints) {
+  if (!weather || incidentPoints.length === 0) {
+    return [];
+  }
+  const first = incidentPoints[0].date;
+  const last = incidentPoints[incidentPoints.length - 1].date;
+  return weather.daily.filter((point) => {
+    return point.date >= first && point.date <= last;
+  });
+}
+
+export function getDailyChange(points, date) {
+  const previousDate = new Date(Date.parse(date + "T12:00:00Z") - DAY_MILLISECONDS)
+    .toISOString().slice(0, 10);
+  const point = points.find((record) => {
+    return record.date === date;
+  });
+  const previous = points.find((record) => {
+    return record.date === previousDate;
+  });
+  return point && previous ? point.count - previous.count : null;
+}
+
+export function formatDailyChange(change) {
+  if (!Number.isFinite(change)) {
+    return "";
+  }
+  const arrow = change > 0 ? "↑" : change < 0 ? "↓" : "→";
+  return arrow + " " + Math.abs(change);
+}
+
+export function formatTemperature(meanC) {
+  if (!Number.isFinite(meanC)) {
+    return "няма температура";
+  }
+  return new Intl.NumberFormat("bg-BG", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(meanC) + " °C";
+}
+
+export function makeTemperatureAxis(points) {
+  const values = points.filter((point) => {
+    return Number.isFinite(point.meanC);
+  }).map((point) => {
+    return point.meanC;
+  });
+  if (values.length === 0) {
+    return null;
+  }
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const step = Math.max(5, Math.ceil((maximum - minimum) / 15) * 5);
+  const low = Math.floor((minimum - 1) / step) * step;
+  const high = Math.max(low + step * 2, Math.ceil((maximum + 1) / step) * step);
+  const ticks = [];
+  for (let value = low; value <= high; value += step) {
+    ticks.push(value);
+  }
+  return { low, high, ticks };
+}
+
+export function makeTimelinePath(points) {
+  let path = "";
+  let previous = null;
+  for (const point of points) {
+    if (!Number.isFinite(point.y)) {
+      previous = null;
+      continue;
+    }
+    const command = !previous || point.timestamp - previous.timestamp > DAY_MILLISECONDS * 1.1 ? "M" : "L";
+    path += command + point.x + "," + point.y + " ";
+    previous = point;
+  }
+  return path.trim();
 }
 
 function svgElement(name, attributes, text) {
@@ -219,15 +293,24 @@ export function startCounter() {
   const chartButton = root.querySelector("#timeline-interaction");
   const empty = root.querySelector("#timeline-empty");
   const selectedLabel = root.querySelector("#timeline-selected");
-  const period = root.querySelector("#timeline-period");
+  const selectedDay = root.querySelector("#timeline-selected-date");
+  const selectedTime = root.querySelector("#timeline-selected-time");
+  const selectedCount = root.querySelector("#timeline-selected-count");
+  const selectedChange = root.querySelector("#timeline-selected-change");
+  const selectedDelta = root.querySelector("#timeline-selected-delta");
+  const selectedTemperature = root.querySelector("#timeline-selected-temperature");
+  const weatherLegend = root.querySelector("#timeline-weather-legend");
+  const weatherNotice = root.querySelector("#timeline-weather-notice");
+  const weatherCredit = root.querySelector(".st-weather-credit");
   let data = null;
   let points = [];
   let plotted = [];
   let selectedDate = null;
   let cursor = null;
   let focusDot = null;
+  let weatherFocusDot = null;
+  let weatherPlotted = [];
   let pendingRequest = false;
-  let refreshFailed = false;
   let resizeFrame = null;
 
   function fitNumber() {
@@ -248,23 +331,54 @@ export function startCounter() {
     cursor.setAttribute("x2", String(point.x));
     focusDot.setAttribute("cx", String(point.x));
     focusDot.setAttribute("cy", String(point.y));
+    const temperaturePoint = weatherPlotted.find((weatherPoint) => {
+      return weatherPoint.date === point.date;
+    });
+    const temperature = temperaturePoint?.meanC ?? null;
+    if (weatherFocusDot) {
+      weatherFocusDot.setAttribute("visibility", Number.isFinite(temperaturePoint?.y) ? "visible" : "hidden");
+      weatherFocusDot.setAttribute("cx", String(point.x));
+      weatherFocusDot.setAttribute("cy", String(temperaturePoint?.y ?? 0));
+    }
     const day = formatCalendarDate(point.date);
     const time = point.isCurrent ? ", " + timeFormatter.format(new Date(point.observedAt)) : "";
-    selectedLabel.textContent = day + time + " · " + point.count;
-    chartButton.setAttribute("aria-label", day + time + ": " + point.count + " аварии и ремонти. Използвай стрелките за друг ден.");
+    const change = getDailyChange(points, point.date);
+    selectedDay.textContent = day;
+    selectedDay.dateTime = point.date;
+    selectedTime.textContent = point.isCurrent ? "към " + timeFormatter.format(new Date(point.observedAt)) : "";
+    selectedCount.textContent = String(point.count);
+    selectedChange.hidden = change === null;
+    selectedDelta.textContent = formatDailyChange(change);
+    selectedTemperature.textContent = Number.isFinite(temperature) ? formatTemperature(temperature) : "няма данни";
+    selectedTemperature.classList.toggle("st-selection-missing", !Number.isFinite(temperature));
+    let changeDescription = "";
+    if (change !== null) {
+      changeDescription = change === 0
+        ? " Без промяна от предходния ден."
+        : " С " + Math.abs(change) + " " + (change > 0 ? "повече" : "по-малко") + " от предходния ден.";
+    }
+    const temperatureDescription = data.weather ? " Средна температура в София: " + formatTemperature(temperature) + "." : "";
+    chartButton.setAttribute("aria-label", day + time + ": " + point.count + " аварии и ремонти." + changeDescription + temperatureDescription + " Използвай стрелките за друг ден.");
   }
 
   function drawTimeline() {
     svg.replaceChildren();
     cursor = null;
     focusDot = null;
+    weatherFocusDot = null;
     plotted = [];
+    weatherPlotted = [];
     empty.hidden = points.length > 0;
     chartButton.disabled = points.length === 0;
+    selectedLabel.hidden = points.length === 0;
+    const weatherPoints = getWeatherPoints(data?.weather, points);
+    const temperatureAxis = makeTemperatureAxis(weatherPoints);
+    weatherLegend.hidden = !data?.weather;
+    weatherNotice.textContent = temperatureAxis
+      ? "Средна дневна температура за София."
+      : "В момента няма температури за показания период.";
 
     if (points.length === 0) {
-      selectedLabel.textContent = "";
-      period.textContent = "";
       svg.setAttribute("aria-label", "Няма налични данни за графиката");
       return;
     }
@@ -273,7 +387,7 @@ export function startCounter() {
     const height = Math.max(72, chart.clientHeight);
     const axis = makeYAxis(points);
     const left = Math.max(34, String(axis.high).length * 7 + 12);
-    const right = 14;
+    const right = temperatureAxis ? 49 : 14;
     const top = 15;
     const bottom = height - 29;
     const plotWidth = Math.max(60, width - left - right);
@@ -281,7 +395,7 @@ export function startCounter() {
     const lastTime = Date.parse(points[points.length - 1].date + "T12:00:00Z");
     const timeSpan = lastTime - firstTime;
     svg.setAttribute("viewBox", "0 0 " + width + " " + height);
-    svg.setAttribute("aria-label", "Брой аварии и ремонти от " + formatCalendarDate(points[0].date) + " до " + formatCalendarDate(points[points.length - 1].date));
+    svg.setAttribute("aria-label", "Брой аварии и ремонти" + (temperatureAxis ? " и средна температура в София" : "") + " от " + formatCalendarDate(points[0].date) + " до " + formatCalendarDate(points[points.length - 1].date));
 
     const visibleTicks = axis.ticks.filter((tick, index) => {
       if (height >= 180) {
@@ -298,6 +412,38 @@ export function startCounter() {
       svg.append(svgElement("text", { class: "st-chart-label", x: left - 10, y: y + 4, "text-anchor": "end" }, tick));
     }
 
+    if (temperatureAxis) {
+      for (const [index, tick] of temperatureAxis.ticks.entries()) {
+        if (height < 120 && index !== 0 && index !== temperatureAxis.ticks.length - 1) {
+          continue;
+        }
+        const y = bottom - (tick - temperatureAxis.low) / (temperatureAxis.high - temperatureAxis.low) * (bottom - top);
+        svg.append(svgElement("text", {
+          class: "st-chart-label st-chart-temperature-label",
+          x: width - right + 9,
+          y: y + 4,
+          "text-anchor": "start",
+        }, tick + " °C"));
+      }
+      weatherPlotted = weatherPoints.map((point) => {
+        const timestamp = Date.parse(point.date + "T12:00:00Z");
+        return {
+          ...point,
+          timestamp,
+          x: timeSpan === 0 ? left + plotWidth / 2 : left + (timestamp - firstTime) / timeSpan * plotWidth,
+          y: Number.isFinite(point.meanC)
+            ? bottom - (point.meanC - temperatureAxis.low) / (temperatureAxis.high - temperatureAxis.low) * (bottom - top)
+            : null,
+        };
+      });
+      svg.append(svgElement("path", { class: "st-chart-temperature-line", d: makeTimelinePath(weatherPlotted) }));
+      for (const point of weatherPlotted) {
+        if (Number.isFinite(point.y)) {
+          svg.append(svgElement("circle", { class: "st-chart-temperature-point", cx: point.x, cy: point.y, r: 2 }));
+        }
+      }
+    }
+
     plotted = points.map((point) => {
       const timestamp = Date.parse(point.date + "T12:00:00Z");
       return {
@@ -308,14 +454,7 @@ export function startCounter() {
       };
     });
 
-    let path = "";
-    for (let index = 0; index < plotted.length; index++) {
-      const point = plotted[index];
-      const previous = plotted[index - 1];
-      const command = !previous || point.timestamp - previous.timestamp > DAY_MILLISECONDS * 1.1 ? "M" : "L";
-      path += command + point.x + "," + point.y + " ";
-    }
-    svg.append(svgElement("path", { class: "st-chart-line", d: path.trim() }));
+    svg.append(svgElement("path", { class: "st-chart-line", d: makeTimelinePath(plotted) }));
 
     for (const point of plotted) {
       svg.append(svgElement("circle", {
@@ -344,13 +483,14 @@ export function startCounter() {
     cursor = svgElement("line", { class: "st-chart-cursor", x1: 0, x2: 0, y1: top, y2: bottom });
     focusDot = svgElement("circle", { class: "st-chart-focus", cx: 0, cy: 0, r: 4.5 });
     svg.append(cursor, focusDot);
+    if (temperatureAxis) {
+      weatherFocusDot = svgElement("circle", { class: "st-chart-focus st-chart-temperature-focus", cx: 0, cy: 0, r: 4 });
+      svg.append(weatherFocusDot);
+    }
     const selection = plotted.findIndex((point) => {
       return point.date === selectedDate;
     });
     selectPoint(selection < 0 ? plotted.length - 1 : selection);
-    period.textContent = points.length === 1
-      ? formatCalendarDate(points[0].date)
-      : formatCalendarDate(points[0].date) + " до " + formatCalendarDate(points[points.length - 1].date);
   }
 
   function updatePresentation() {
@@ -358,15 +498,11 @@ export function startCounter() {
     observedLabel.dateTime = data?.current?.observedAt ?? "";
     comparison.textContent = formatComparisonText(data?.comparison, data?.current);
     notice.textContent = getDataNotice(data?.current);
-    if (refreshFailed && data?.current) {
-      notice.textContent = "Показваме последните налични данни.";
-    }
   }
 
   function acceptData(value) {
     const nextData = normalizeTimeline(value);
     data = nextData;
-    refreshFailed = false;
     points = getTimelinePoints(data);
     count.textContent = data.current ? String(data.current.count) : "?";
     updatePresentation();
@@ -393,7 +529,6 @@ export function startCounter() {
       }
       acceptData(await response.json());
     } catch {
-      refreshFailed = true;
       updatePresentation();
     } finally {
       window.clearTimeout(timeout);
@@ -418,6 +553,13 @@ export function startCounter() {
 
   chartButton.addEventListener("pointermove", selectAtPointer);
   chartButton.addEventListener("pointerdown", selectAtPointer);
+  weatherCredit.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && weatherCredit.open) {
+      event.preventDefault();
+      weatherCredit.open = false;
+      weatherCredit.querySelector("summary").focus();
+    }
+  });
   chartButton.addEventListener("keydown", (event) => {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") {
       return;

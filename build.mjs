@@ -3,9 +3,10 @@ import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { escapeHtml, normalizeTimeline, presentation, serializeData } from "./data.mjs";
+import { escapeHtml, normalizeTimeline, presentation, serializeData, sofiaDate } from "./data.mjs";
 import { renderShareImage } from "./share-image.mjs";
 import { normalizeIncidents } from "./src/incidents.js";
+import { fetchWeather } from "./weather.mjs";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 
@@ -57,6 +58,8 @@ export async function fetchIncidents(timelineUrl, apiKey) {
 export async function buildSite({
   data,
   incidents = null,
+  weather,
+  fetchWeatherHistory = false,
   outDirectory = resolve(directory, "dist"),
   siteUrl = "https://nastud.site/",
   requireCurrent = false,
@@ -77,12 +80,29 @@ export async function buildSite({
     daily: [],
     comparison: null,
   };
-  const timeline = normalizeTimeline(incidentListing ? {
+  const timeline = normalizeTimeline({
     ...timelineInput,
-    current: { count: incidentListing.count, observedAt: incidentListing.observedAt },
-  } : timelineInput);
+    weather: weather === undefined ? timelineInput.weather : weather,
+    current: incidentListing
+      ? { count: incidentListing.count, observedAt: incidentListing.observedAt }
+      : timelineInput.current,
+  });
   if (requireCurrent && !timeline.current) {
     throw new Error("A current snapshot is required before publishing");
+  }
+  const today = sofiaDate(now);
+  if (timeline.weather?.daily.some((day) => {
+    return day.date >= today && day.meanC !== null;
+  })) {
+    throw new Error("Weather daily means must be from completed Sofia days");
+  }
+  if (fetchWeatherHistory) {
+    try {
+      timeline.weather = await fetchWeather(timeline, { now });
+    } catch {
+      timeline.weather = null;
+      console.warn("Temperature history unavailable. Building the incident timeline with no temperature data.");
+    }
   }
   const values = presentation(timeline, now);
   const image = renderShareImage(timeline, { now });
@@ -139,6 +159,7 @@ async function main() {
     options: {
       data: { type: "string" },
       incidents: { type: "string" },
+      weather: { type: "string" },
       out: { type: "string" },
       "site-url": { type: "string" },
       fetch: { type: "boolean" },
@@ -159,9 +180,14 @@ async function main() {
   if (values.incidents) {
     incidents = JSON.parse(await readFile(resolve(values.incidents), "utf8"));
   }
+  const weather = values.weather
+    ? JSON.parse(await readFile(resolve(values.weather), "utf8"))
+    : undefined;
   await buildSite({
     data,
     incidents,
+    weather,
+    fetchWeatherHistory: Boolean(values.fetch && !values.data && !values.weather),
     outDirectory: values.out ? resolve(values.out) : undefined,
     siteUrl: values["site-url"],
     requireCurrent: values["require-current"],

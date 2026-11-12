@@ -37,25 +37,41 @@
         <main class="st-content">
           <section class="st-counter" aria-labelledby="counter-heading">
             <div>
-              <h1 id="counter-heading"><a href="https://toplo.bg/accidents-and-maintenance" target="_blank" rel="noopener noreferrer">Аварии и ремонти</a> <time id="observed-label" datetime="{{CURRENT_DATETIME}}">{{OBSERVED_LABEL}}</time></h1>
+              <h1 id="counter-heading"><button class="st-incidents-open" id="incidents-open" type="button" aria-haspopup="dialog" aria-controls="incidents-dialog" disabled>Аварии и ремонти</button> <time id="observed-label" datetime="{{CURRENT_DATETIME}}">{{OBSERVED_LABEL}}</time></h1>
               <p class="st-number" id="current-count">{{COUNT}}</p>
               <p class="st-comparison" id="comparison">{{COMPARISON}}</p>
               <p class="st-data-notice" id="data-notice" role="status">{{DATA_NOTICE}}</p>
-              <button class="st-incidents-open" id="incidents-open" type="button" aria-haspopup="dialog" aria-controls="incidents-dialog" disabled>Виж всички аварии и ремонти</button>
               <noscript><p class="st-data-notice">За пълния списък отвори <a href="https://toplo.bg/accidents-and-maintenance">сайта на Топлофикация</a>.</p></noscript>
             </div>
           </section>
-          <section class="st-timeline" aria-labelledby="timeline-heading">
-            <div class="st-timeline-heading">
-              <h2 id="timeline-heading">Как се променя броят</h2>
-              <p class="st-timeline-selected" id="timeline-selected" aria-live="polite"></p>
+          <section class="st-timeline" aria-label="Аварии и ремонти и температура по дни">
+            <div class="st-timeline-selected" id="timeline-selected" aria-live="polite" hidden>
+              <div class="st-selection-date">
+                <time id="timeline-selected-date"></time>
+                <span class="st-selection-time" id="timeline-selected-time"></span>
+              </div>
+              <div class="st-selection-values">
+                <div class="st-selection-incidents">
+                  <span class="st-selection-label">Аварии и ремонти</span>
+                  <div class="st-selection-number">
+                    <strong id="timeline-selected-count"></strong>
+                    <span class="st-selection-unit" aria-hidden="true">бр.</span>
+                    <span class="st-selection-change" id="timeline-selected-change" title="Промяна от предходния ден" hidden>
+                      <span id="timeline-selected-delta"></span>
+                    </span>
+                  </div>
+                </div>
+                <div class="st-selection-weather" id="timeline-weather-legend" hidden>
+                  <span class="st-selection-label">Температура</span>
+                  <div class="st-selection-number"><strong id="timeline-selected-temperature"></strong></div>
+                </div>
+              </div>
             </div>
             <div class="st-chart" id="timeline-chart">
               <svg class="st-chart-svg" id="timeline-svg" role="img" aria-label="Брой аварии и ремонти по дни"></svg>
               <button class="st-chart-interaction" id="timeline-interaction" type="button" aria-label="Избери ден от графиката. Използвай стрелките наляво и надясно."><span class="st-sr-only">Избери ден от графиката</span></button>
               <p class="st-timeline-empty" id="timeline-empty">Историята ще се появи тук.</p>
             </div>
-            <p class="st-timeline-period" id="timeline-period"></p>
           </section>
         </main>
         <section class="st-street" aria-label="Улица с шахти">
@@ -69,10 +85,21 @@
           </div>
           <div class="st-effects" aria-hidden="true"></div>
           <span class="st-hint">Пусни малко пара.</span>
-          <footer class="st-footer">
-            <p class="st-credit">с данни от <a href="https://oboapp.online" target="_blank" rel="noopener noreferrer">OboApp</a></p>
-          </footer>
         </section>
+        <footer class="st-footer">
+          <div class="st-credit">
+            <span>с данни от <a href="https://oboapp.online" target="_blank" rel="noopener noreferrer">OboApp</a> и </span>
+            <details class="st-weather-credit">
+              <summary title="Средна дневна температура за София. Натисни за източника и подробности.">Open-Meteo</summary>
+              <div class="st-weather-details">
+                <p id="timeline-weather-notice">Средна дневна температура за София.</p>
+                <p>Изчисляваме средните стойности от часовите данни на модела ECMWF IFS.</p>
+                <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Източник: Open-Meteo</a>
+              </div>
+            </details>
+            <span> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a></span>
+          </div>
+        </footer>
         <span class="st-announcement" role="status" aria-live="polite"></span>
       </div>
       <dialog class="st-incidents-dialog" id="incidents-dialog" aria-labelledby="incidents-heading" aria-describedby="incidents-description">
@@ -84,7 +111,7 @@
           <button class="st-incidents-close" id="incidents-close" type="button" autofocus>Затвори</button>
         </div>
         <div class="st-incidents-body">
-          <p class="st-incidents-description" id="incidents-description">Записите още са в сайта на Топлофикация. Възрастта е по обявеното начало. Сравняваме текущия срок с първия, който сме запазили.</p>
+          <p class="st-incidents-description" id="incidents-description">Записите още са в сайта на Топлофикация. Броим дните от посоченото начало до датата на проверката. Сравняваме текущия срок с първия запазен срок.</p>
           <div class="st-incidents-controls">
             <label for="incidents-sort">Подреди по
               <select id="incidents-sort">

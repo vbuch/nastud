@@ -111,6 +111,20 @@ export function getIncidentAgeDays(incident, observedAt) {
   return Math.max(0, Math.round((observedDay - startDay) / DAY_MILLISECONDS));
 }
 
+export function formatIncidentAge(incident, observedAt) {
+  const days = getIncidentAgeDays(incident, observedAt);
+  if (days === null) {
+    return null;
+  }
+  if (incident.reportedStart.slice(0, 10) > getSofiaDateKey(observedAt)) {
+    return "Посоченото начало е след датата на проверката.";
+  }
+  if (days === 0) {
+    return "Началото е в деня на проверката.";
+  }
+  return "От посоченото начало: " + days + (days === 1 ? " ден" : " дни");
+}
+
 export function getEstimateExtensionDays(incident) {
   if (!incident.estimatedEnd || !incident.firstEstimatedEnd) {
     return null;
@@ -162,16 +176,25 @@ export function formatIncidentDate(value) {
 }
 
 export function formatExtension(incident) {
+  if (!incident.estimatedEnd) {
+    return "Няма обявен текущ срок за приключване.";
+  }
   const days = getEstimateExtensionDays(incident);
   if (days === null) {
-    return "Няма запазен първи срок за сравнение";
+    return "Няма запазен първи срок за сравнение.";
   }
   if (days === 0) {
-    return "Срокът е същият като при първия запис";
+    return "Текущият срок съвпада с първия запазен срок.";
   }
-  const rounded = Math.round(Math.abs(days));
-  const amount = rounded === 0 ? "по-малко от ден" : rounded === 1 ? "около 1 ден" : "около " + rounded + " дни";
-  return "Срокът е с " + amount + (days > 0 ? " по-късно" : " по-рано");
+  const absoluteDays = Math.abs(days);
+  const rounded = Math.round(absoluteDays);
+  let amount = "по-малко от 1 ден";
+  if (absoluteDays >= 1) {
+    const approximation = Number.isInteger(absoluteDays) ? "" : "около ";
+    amount = approximation + rounded + (rounded === 1 ? " ден" : " дни");
+  }
+  const direction = days > 0 ? "по-късен" : "по-ранен";
+  return "Текущият срок е с " + amount + " " + direction + " от първия запазен срок.";
 }
 
 export function getIncidentsNotice(snapshot, now = new Date(), refreshFailed = false) {
@@ -209,10 +232,9 @@ function renderIncident(incident, observedAt) {
   if (incident.addresses.trim()) {
     item.append(element("p", "st-incident-addresses", incident.addresses));
   }
-  const age = getIncidentAgeDays(incident, observedAt);
+  const age = formatIncidentAge(incident, observedAt);
   if (age !== null) {
-    const ageText = age === 1 ? "1 ден" : age + " дни";
-    item.append(element("p", "st-incident-age", ageText + " по обявеното начало"));
+    item.append(element("p", "st-incident-age", age));
   }
   const details = element("dl", "st-incident-dates");
   addDate(details, "Обявено начало", incident.reportedStart);
@@ -289,7 +311,7 @@ export function startIncidents() {
     snapshot = next;
     refreshFailed = false;
     openButton.disabled = false;
-    openButton.textContent = "Виж всички аварии и ремонти (" + snapshot.count + ")";
+    openButton.removeAttribute("title");
     renderList();
   }
 
@@ -314,7 +336,7 @@ export function startIncidents() {
       refreshFailed = true;
       updateNotice();
       if (!snapshot) {
-        openButton.textContent = "Списъкът временно не е наличен";
+        openButton.title = "Списъкът временно не е наличен";
       }
     } finally {
       window.clearTimeout(timeout);

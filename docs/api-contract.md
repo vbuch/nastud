@@ -109,3 +109,23 @@ including when the provider only has older count-only snapshots. Authentication,
 rate-limit, unsupported-source and storage errors also stop publication. A
 failed publication preserves the prior site. Browser failures preserve the last
 valid local snapshot and its original timestamp.
+
+## Published temperature data
+
+Na Stud adds optional weather data to its own published timeline. This field is
+independent of the OboApp API contract. The build obtains hourly Celsius
+temperatures from Open-Meteo's ECMWF IFS archive and calculates complete Sofia
+calendar-day means. OboApp continues to supply all incident observations.
+
+`weather` is null when unavailable. Otherwise it contains `provider: "open-meteo"`,
+`model: "ecmwf_ifs"`, `latitude: 42.6977`, `longitude: 23.3219`,
+`timezone: "Europe/Sofia"` and a sorted `daily` array. Each entry has a valid
+calendar `date` and a numeric `meanC`, or null for an incomplete day. Zero and
+negative temperatures are valid. Duplicate dates, invalid metadata and invalid
+temperatures are rejected. The browser and build use the same validation.
+
+Daily means cover completed Sofia days only. The provider can supply forecast
+hours for today, so requests stop at yesterday and require every local-day hour.
+Never show a forecast-filled or partial mean for the unfinished current day.
+The source and build failure behavior are described in
+[operations](operations.md#temperature-history).

@@ -38,13 +38,57 @@ through GitHub Pages.
 It publishes the HTML, public JSON, sharing images and hosting files together.
 Concurrency limits overlapping publications for the same Git reference.
 
+Current-data builds also request Sofia temperature history from Open-Meteo's
+archive API. This request uses no API key. Weather failure publishes the valid
+incident data with a temperature-unavailable notice. OboApp endpoint failures
+continue to stop publication.
+
 Pull requests run tests and build fixture previews. They do not publish to the
 production Pages environment. Use a preview artifact to review a pull request.
 
-Production fetches require both endpoints to succeed and pass validation.
-Missing data, invalid responses or build failures leave the previous successful
-site in place. GitHub may cache public responses and social platforms may cache
-their own sharing previews.
+Production fetches require both OboApp endpoints to succeed and pass validation.
+Missing incident data, invalid incident responses or build failures leave the
+previous successful site in place. GitHub may cache public responses and social
+platforms may cache their own sharing previews.
+
+## Temperature history
+
+The weather source is [Open-Meteo's Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api),
+using ECMWF IFS at `42.6977, 23.3219`. The model covers history from 2017 and
+updates every six hours. Each build requests at most the latest 366
+incident-calendar days, ending no later than yesterday in Sofia. The provider
+can return forecast-filled hours for today, so exclude today's unfinished mean
+even when every hourly slot has a numeric value.
+
+The build requests hourly Celsius values in UTC and calculates daily means in
+`Europe/Sofia`. A complete local day requires all 23, 24 or 25 hours. Missing
+hours or null values produce an unknown daily mean. The public `weather` field
+inside `timeline.json` records the provider, model, coordinates, timezone and
+daily `{ date, meanC }` values. It is also present in the initial HTML bootstrap.
+The browser reads this same-origin file with the incident timeline.
+
+`node build.mjs --fetch --require-current` fetches weather automatically after
+validating the incident data. Failed, malformed or timed-out weather responses
+produce `weather: null` and a build warning. The incident snapshot and its source
+observation time remain intact. A supplied weather fixture must pass validation.
+
+The standard fixture timeline includes sample temperature values and needs no
+network. Use `--weather test/fixtures/weather.json` to supply a separate weather
+fixture when building another timeline. These samples are for development.
+
+Keep Open-Meteo beside OboApp in the bottom credit, with the
+[CC BY 4.0 licence link](https://creativecommons.org/licenses/by/4.0/).
+Keep the daily-average explanation and model source in the Open-Meteo footer
+details, accessible by pointer, touch and keyboard. See the provider's
+[attribution requirements](https://open-meteo.com/en/licence).
+The [free API terms](https://open-meteo.com/en/terms) permit personal,
+noncommercial sites without advertising and limit usage to fewer than 10,000
+calls per day. Recheck the terms before changing the site's business model.
+
+After publication, inspect the `weather` metadata and date range in
+`timeline.json`. Select yesterday or an older chart day to check the °C value,
+then today's incident point to check the missing-temperature label. Confirm that a weather failure
+leaves the counter and incident list usable.
 
 ## Routine release
 
@@ -56,8 +100,38 @@ their own sharing previews.
 6. Follow the Pages workflow to a successful build and deployment.
 7. Check `https://nastud.site/`, `timeline.json` and `incidents.json`.
 8. Confirm that the displayed count equals the incident count and that the counter and list use the same original observation timestamp.
-9. Open the list, change a sort and filter, and check the first result. Check phone layout when the release changes layout.
+9. Open the list from the “Аварии и ремонти” heading, change a sort and filter, and check the first result. Close with Escape and verify that focus returns to the heading. Check phone layout when the release changes layout.
 10. For sharing changes, verify initial-HTML metadata and that the landscape and square image URLs return valid PNGs.
+
+For incident wording changes, check a one-day age, an older record, a future
+start and a record without a start date. Day counts refer to the source-check
+date. Check earlier, later, equal and missing completion estimates; each
+comparison must name the first saved estimate and distinguish which estimate
+is missing.
+
+For graph or footer changes, check the simple series labels and select a day
+with the arrow keys. Confirm that the compact values sit at the graph's sides
+and leave most of the section for the plot. At narrow widths, check the centered
+date, count unit and temperature unit. Values must not shift the graph when a daily
+comparison or temperature is missing. Verify the selected count's change arrow and amount against
+the preceding calendar day's count; a gap must omit the change. The chart has no
+visible “от вчера” caption. The main comparison below the big count uses
+“от вчера” only for a current-day Sofia observation and yesterday's baseline.
+Older observations name the baseline date. Preserve the full source timestamp
+and omit the generic old-data message for a valid observation.
+Open the Open-Meteo details using pointer and keyboard,
+then close with Escape. Check the details at 320px and in phone landscape.
+In phone landscape, confirm that the road and its controls are hidden, the
+chart uses the freed height and the source credits remain available. Rotate
+back to portrait and confirm that the road returns.
+
+For road changes, confirm that the covers drift while the page is visible and
+release steam when activated. Keyboard focus on a cover pauses movement for a
+stable target. Pointer input, leaving the cover, and returning to a visible
+page must let movement resume. A system reduced-motion preference intentionally
+keeps the road still. On macOS, check the accessibility motion preference when
+investigating a still road; a Windows browser review cannot verify a reported
+MacBook-specific failure.
 
 Use a manual dispatch after configuration changes or after an API deployment
 becomes ready. A production build can be run locally with the two environment
