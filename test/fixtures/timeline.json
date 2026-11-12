@@ -4,6 +4,9 @@
   "sourceUrl": "https://toplo.bg/accidents-and-maintenance",
   "current": { "count": 99, "observedAt": "2026-11-09T20:30:00.000Z" },
   "daily": [
+    { "date": "2026-10-28", "count": 97, "observedAt": "2026-10-28T20:30:00.000Z" },
+    { "date": "2026-10-29", "count": 104, "observedAt": "2026-10-29T20:30:00.000Z" },
+    { "date": "2026-10-30", "count": 102, "observedAt": "2026-10-30T20:30:00.000Z" },
     { "date": "2026-11-07", "count": 100, "observedAt": "2026-11-07T20:30:00.000Z" },
     { "date": "2026-11-08", "count": 103, "observedAt": "2026-11-08T20:30:00.000Z" }
   ],
@@ -15,6 +18,9 @@
     "longitude": 23.3219,
     "timezone": "Europe/Sofia",
     "daily": [
+      { "date": "2026-10-28", "meanC": 9.3 },
+      { "date": "2026-10-29", "meanC": 7.1 },
+      { "date": "2026-10-30", "meanC": 6.4 },
       { "date": "2026-11-07", "meanC": 5.8 },
       { "date": "2026-11-08", "meanC": 3.2 },
       { "date": "2026-11-09", "meanC": null }

@@ -44,6 +44,7 @@
     --st-shadow: #090b0e90;
     --st-accent: #802f2d;
     --st-temperature: #8ebdbd;
+    --st-milestone: #d6bc83;
     --st-tilt: 38deg;
     color-scheme: dark;
     width: 100%;
@@ -439,6 +440,9 @@
     height: 100%;
     overflow: visible;
   }
+  #counter-app .st-chart-has-milestone {
+    min-height: 96px;
+  }
   #counter-app .st-chart-interaction {
     position: absolute;
     inset: 0;
@@ -455,6 +459,36 @@
   }
   #counter-app .st-chart-interaction:disabled {
     display: none;
+  }
+  #counter-app .st-chart-milestones {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  #counter-app .st-chart-milestone {
+    position: absolute;
+    top: 0;
+    width: max-content;
+    max-width: min(280px, calc(100% - 12px));
+    padding: 2px 0;
+    color: var(--st-milestone);
+    font-size: 12px;
+    line-height: 1.3;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    pointer-events: auto;
+  }
+  #counter-app .st-chart-milestone:hover {
+    color: var(--st-ink);
+  }
+  #counter-app .st-chart-milestone-line {
+    stroke: var(--st-milestone);
+    stroke-opacity: 0.6;
+    stroke-width: 1;
+    stroke-dasharray: 2 4;
+  }
+  #counter-app .st-chart-milestone-cap {
+    fill: var(--st-milestone);
   }
   #counter-app .st-timeline-empty {
     position: absolute;
