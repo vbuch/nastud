@@ -1,4 +1,5 @@
 import { formatComparisonText, formatObservedLabel, getSofiaDateKey } from "./src/app.js";
+import { normalizeWeather } from "./src/weather.js";
 
 export const SOURCE_URL = "https://toplo.bg/accidents-and-maintenance";
 
@@ -66,7 +67,15 @@ export function normalizeTimeline(input) {
   });
   const baseline = current ? points.get(previousDate(sofiaDate(current.observedAt))) : null;
   const comparison = baseline ? { ...baseline, change: current.count - baseline.count } : null;
-  return { sourceType: "toplo-bg", locality: "bg.sofia", sourceUrl: SOURCE_URL, current, daily, comparison };
+  return {
+    sourceType: "toplo-bg",
+    locality: "bg.sofia",
+    sourceUrl: SOURCE_URL,
+    current,
+    daily,
+    comparison,
+    weather: normalizeWeather(input.weather ?? null),
+  };
 }
 
 export function presentation(timeline, now = new Date()) {
@@ -80,10 +89,8 @@ export function presentation(timeline, now = new Date()) {
   }
   const observedLabel = formatObservedLabel(current.observedAt, now);
   const comparison = formatComparisonText(timeline.comparison, current, now);
-  const age = now.getTime() - Date.parse(current.observedAt);
-  const notice = age > 90 * 60 * 1000 ? "Показваме последните налични данни." : "";
   return {
-    count: String(current.count), observedLabel, currentDatetime: current.observedAt, comparison, notice,
+    count: String(current.count), observedLabel, currentDatetime: current.observedAt, comparison, notice: "",
     title: current.count + " аварии и ремонти на Топлофикация | На студ",
     description: ["Топлофикация София: " + current.count + " аварии и ремонти " + observedLabel + ".", comparison, "Виж дневната история."].filter(Boolean).join(" "),
   };

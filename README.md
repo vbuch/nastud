@@ -2,7 +2,9 @@
 
 [nastud.site](https://nastud.site/) shows the accidents and repairs currently
 listed by Toplofikatsia Sofia. It combines a large counter, daily history, a
-sortable incident list and an interactive road with manhole covers.
+sortable incident list and an interactive road with manhole covers. The timeline
+also compares incident counts with Sofia's daily mean temperature from
+Open-Meteo's ECMWF IFS history.
 
 OboApp supplies the data through its public API. This repository owns the
 website, product specification, tests and publication workflow.
@@ -41,6 +43,12 @@ node build.mjs --fetch --require-current
 
 Keep the key in a local secret store or GitHub Actions secret. Generated site
 files contain public observations only. Never commit a real key.
+
+Current-data builds also fetch temperature history for completed Sofia days
+without an API key. A weather outage leaves the incident chart
+available. Fixture builds include sample temperatures and need no network.
+See [temperature operations](docs/operations.md#temperature-history) for the
+source, daily averaging and attribution.
 
 ## Publication
 

@@ -9,19 +9,24 @@ import { normalizeTimeline, presentation, serializeData } from "../data.mjs";
 const fixture = JSON.parse(await readFile(new URL("./fixtures/timeline.json", import.meta.url), "utf8"));
 const incidents = JSON.parse(await readFile(new URL("./fixtures/incidents.json", import.meta.url), "utf8"));
 
-test("shows yesterday's change, retaining explicit dates when the data is old", () => {
+test("uses yesterday for today's snapshot and preserves explicit dates for an older snapshot", () => {
   const timeline = normalizeTimeline(fixture);
-  assert.equal(presentation(timeline, new Date("2026-11-09T20:40:00Z")).comparison, "С 4 по-малко спрямо вчера.");
+  assert.equal(presentation(timeline, new Date("2026-11-09T20:40:00Z")).comparison, "С 4 по-малко от вчера.");
   const stale = presentation(timeline, new Date("2026-11-10T10:00:00Z"));
   assert.match(stale.observedLabel, /9 ноември/);
-  assert.match(stale.comparison, /8 ноември/);
+  assert.equal(stale.comparison, "С 4 по-малко от 8 ноември.");
+  assert.equal(stale.notice, "");
+  assert.equal(stale.currentDatetime, fixture.current.observedAt);
 });
 
 test("handles a real zero using the API's daily baseline", () => {
   const timeline = normalizeTimeline({ ...fixture, current: { ...fixture.current, count: 0 } });
   assert.equal(timeline.comparison.count, 103);
   assert.equal(timeline.comparison.change, -103);
-  assert.equal(presentation(timeline).count, "0");
+  const values = presentation(timeline, new Date("2026-11-20T12:00:00Z"));
+  assert.equal(values.count, "0");
+  assert.equal(values.notice, "");
+  assert.equal(values.currentDatetime, fixture.current.observedAt);
 });
 
 test("omits a comparison when yesterday is missing", () => {
@@ -46,7 +51,7 @@ test("uses the new nightly closing count after the next Sofia day begins", () =>
     observedAt: "2026-11-10T20:30:00.000Z",
     change: -3,
   });
-  assert.equal(presentation(timeline, new Date("2026-11-11T05:10:00Z")).comparison, "С 3 по-малко спрямо вчера.");
+  assert.equal(presentation(timeline, new Date("2026-11-11T05:10:00Z")).comparison, "С 3 по-малко от вчера.");
 });
 
 test("rejects malformed or mismatched source data", () => {
@@ -184,4 +189,87 @@ test("fetches authenticated listing data and refuses unavailable or partial list
 test("rejects insecure API URLs and credentials embedded in URLs before sending a key", async () => {
   await assert.rejects(fetchTimeline("http://api.example.com/v1/sources/toplo-bg/timeline", "test-key"), /HTTPS/);
   await assert.rejects(fetchTimeline("https://user:password@api.example.com/v1/sources/toplo-bg/timeline", "test-key"), /credentials/);
+});
+
+test("publishes the same validated temperature history in HTML and public JSON", async () => {
+  const outDirectory = await mkdtemp(join(tmpdir(), "nastud-weather-build-"));
+  try {
+    const { html, timeline } = await buildSite({ data: fixture, incidents, outDirectory });
+    const published = JSON.parse(await readFile(join(outDirectory, "timeline.json"), "utf8"));
+    const bootstrap = /<script id="initial-timeline" type="application\/json">([\s\S]*?)<\/script>/.exec(html);
+
+    assert.deepEqual(published.weather, fixture.weather);
+    assert.deepEqual(JSON.parse(bootstrap[1]).weather, published.weather);
+    assert.deepEqual(timeline.current, { count: incidents.count, observedAt: incidents.observedAt });
+    assert.match(await readFile(join(outDirectory, "weather.js"), "utf8"), /normalizeWeather/);
+    assert.match(html, /https:\/\/open-meteo.com\//);
+    assert.match(html, /https:\/\/creativecommons.org\/licenses\/by\/4.0\//);
+  } finally {
+    await rm(outDirectory, { recursive: true, force: true });
+  }
+});
+
+test("a weather outage preserves the incident publication and original observation time", async (context) => {
+  const outDirectory = await mkdtemp(join(tmpdir(), "nastud-weather-failure-"));
+  const warnings = [];
+  context.mock.method(console, "warn", (message) => {
+    warnings.push(message);
+  });
+  context.mock.method(globalThis, "fetch", async (url, options) => {
+    assert.equal(new URL(url).hostname, "archive-api.open-meteo.com");
+    assert.equal(options.headers["X-Api-Key"], undefined);
+    return new Response("Unavailable", { status: 503 });
+  });
+  try {
+    const { timeline } = await buildSite({
+      data: fixture,
+      incidents,
+      outDirectory,
+      fetchWeatherHistory: true,
+      requireCurrent: true,
+      now: new Date("2026-11-20T12:00:00Z"),
+    });
+    const published = JSON.parse(await readFile(join(outDirectory, "timeline.json"), "utf8"));
+
+    assert.equal(published.weather, null);
+    assert.deepEqual(published.current, { count: incidents.count, observedAt: incidents.observedAt });
+    assert.deepEqual(published.daily, fixture.daily);
+    assert.deepEqual(timeline.weather, null);
+    assert.equal(warnings.length, 1);
+  } finally {
+    await rm(outDirectory, { recursive: true, force: true });
+  }
+});
+
+test("rejects malformed supplied temperature data before generating a site", async () => {
+  await assert.rejects(buildSite({
+    data: fixture,
+    weather: { ...fixture.weather, daily: [{ date: "2026-11-07", meanC: "0" }] },
+  }));
+});
+
+test("rejects supplied current-day or future temperature means even when they are numeric", async () => {
+  for (const date of ["2026-11-12", "2026-11-13"]) {
+    await assert.rejects(buildSite({
+      data: fixture,
+      weather: { ...fixture.weather, daily: [{ date, meanC: 12.3 }] },
+      now: new Date("2026-11-11T22:30:00Z"),
+    }), /completed Sofia days/);
+  }
+});
+
+test("keeps timelines with no weather compatible and builds the unavailable state", async () => {
+  const legacyTimeline = structuredClone(fixture);
+  delete legacyTimeline.weather;
+  assert.equal(normalizeTimeline(legacyTimeline).weather, null);
+
+  const outDirectory = await mkdtemp(join(tmpdir(), "nastud-unavailable-build-"));
+  try {
+    const { timeline, values } = await buildSite({ outDirectory });
+    assert.equal(timeline.weather, null);
+    assert.equal(timeline.current, null);
+    assert.equal(values.count, "?");
+  } finally {
+    await rm(outDirectory, { recursive: true, force: true });
+  }
 });
