@@ -318,6 +318,9 @@ export function startCounter() {
   }
 
   const count = root.querySelector("#current-count");
+  if (!count) {
+    return;
+  }
   const observedLabel = root.querySelector("#observed-label");
   const comparison = root.querySelector("#comparison");
   const notice = root.querySelector("#data-notice");

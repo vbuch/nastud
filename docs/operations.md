@@ -15,21 +15,26 @@ the API and owns the source data.
 - pnpm 10.11.0 and the committed lockfile.
 - Repository variable `COUNTER_TIMELINE_URL`: `https://api.oboapp.online/v1/sources/toplo-bg/timeline?days=366`.
 - Repository secret `COUNTER_API_KEY`: a valid OboApp API key for this consumer.
-- Repository variable `PUBLISH_ENABLED`: `true` after the API secret and Pages are configured. Keep it `false` while preparing the extraction, then enable it for the real-data check before switching the domain.
+- Repository variable `PUBLISH_ENABLED`: `true` to allow production publication. Set it to `false` to pause publication.
 - Pages source: GitHub Actions.
 - Pages deployment environment: `github-pages`.
 - Custom domain: `nastud.site`.
 - Enforce HTTPS after GitHub has issued a valid certificate.
 
 Existing GitHub Actions secret values cannot be read back through GitHub. Supply
-the new repository's API secret securely before switching the live publisher.
+or replace the API secret securely when configuring current-data builds.
 Never put it in source files, issue text, workflow output or published artifacts.
+Fixture development and checks need no API key or OboApp checkout. Follow the
+[README development steps](../README.md#development) in a fresh checkout or worktree.
 
 ## Publication flow
 
 `.github/workflows/pages.yml` runs on main-branch pushes, manual dispatches and
 the schedule at minutes 7 and 37 of every hour. Scheduled Actions can start late;
 the source observation time remains the user-visible check time.
+
+Production publication requires the `main` branch, including manual dispatches.
+Dispatches on other branches run the fixture checks and save a preview artifact.
 
 The check job installs locked dependencies, runs tests and builds a reviewable
 fixture artifact. The production jobs run when `PUBLISH_ENABLED` is `true`.
@@ -137,6 +142,35 @@ start and a record without a start date. Day counts refer to the source-check
 date. Check earlier, later, equal and missing completion estimates; each
 comparison must name the first saved estimate and distinguish which estimate
 is missing.
+
+For incident pages, open a record from the numbered list and use its browser URL.
+Check that list numbering follows the selected sort and filter while the detail
+position uses all current records ordered by oldest reported start. Refresh the
+list with a focused record link and confirm that focus stays on its action.
+Check the detail page at desktop width, 320px phone width and phone landscape.
+Check that the address and current deadline lead the page, the position is
+secondary, and no dedicated copy-link control is shown. Compare unknown and
+passed estimates and a missing first capture. The first and latest checks use
+readable cards with distinct check dates, deadlines and plain days-remaining
+labels. Open “Още подробности” with a keyboard and check the extra dates and
+changed-start warning. Intermediate deadline changes
+and position history require a future provider history response; the current
+build must not infer them from aggregate counts.
+
+Each publication generates `incident/{encoded-id}/index.html`, `share.png` and
+`share-square.png` for every current incident. The path uses URL-safe base64 of
+the stable `id`, preserving the link when `accidentId` changes. Inspect initial
+HTML metadata, the incident canonical URL, the source observation time and both
+image sizes. Hosting under a path prefix must preserve asset and JSON reads.
+The bundled font and its licence remain at the site root.
+
+The generated `404.html` lets old incident links check the current listing after
+their static page leaves a later publication. Its base URL uses the configured
+site path prefix. The local development server serves the same fallback with
+HTTP 404. Verify an old incident path and an ordinary unknown path. A record
+absent from a newer complete capture must show no current position and must not
+claim confirmed resolution. A network failure must retain the last valid
+snapshot and its source-check time.
 
 For graph or footer changes, check the simple series labels and select a day
 with the arrow keys. Confirm that the compact values sit at the graph's sides

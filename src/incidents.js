@@ -1,4 +1,6 @@
 import { formatObservedLabel, getSofiaDateKey } from "./app.js";
+import { getIncidentPath } from "./incident-history.js";
+import { getIncidentDetailView } from "./incident-view.js";
 
 const SOURCE_URL = "https://toplo.bg/accidents-and-maintenance";
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
@@ -223,10 +225,17 @@ function addDate(details, label, value) {
   details.append(element("dd", "", formatIncidentDate(value)));
 }
 
-function renderIncident(incident, observedAt) {
+function renderIncident(incident, observedAt, position) {
   const item = element("li", "st-incident");
+  item.dataset.incidentId = incident.id;
+  item.append(element("span", "st-incident-number", "№ " + position));
   const header = element("div", "st-incident-heading");
-  header.append(element("h3", "", incident.name));
+  const heading = element("h3");
+  const titleLink = element("a", "st-incident-link", incident.name);
+  titleLink.href = getIncidentPath(incident.id);
+  titleLink.dataset.action = "heading";
+  heading.append(titleLink);
+  header.append(heading);
   header.append(element("span", "st-incident-type", incident.type === "accident" ? "Авария" : "Ремонт"));
   item.append(header);
   if (incident.addresses.trim()) {
@@ -252,7 +261,168 @@ function renderIncident(incident, observedAt) {
     ? formatIncidentDate(getSofiaDateKey(incident.firstObservedAt) + "T12:00:00Z")
     : null;
   item.append(element("p", "st-incident-first-capture", firstCapture ? "Първи запис при нас: " + firstCapture : "Няма запазена дата на първи запис."));
+  const detailLink = element("a", "st-incident-detail-link", "Виж подробности");
+  detailLink.href = getIncidentPath(incident.id);
+  detailLink.dataset.action = "detail";
+  detailLink.setAttribute("aria-label", "Виж подробности: " + incident.name);
+  item.append(detailLink);
   return item;
+}
+
+function renderOverview(view) {
+  const overview = element("div", "st-incident-overview");
+  const deadline = element("section", "st-incident-deadline-card");
+  deadline.append(element("h2", "", "Обявен срок"));
+  deadline.append(element("p", "st-incident-due-date", view.deadline));
+  deadline.append(element("p", "st-incident-remaining", view.remaining));
+  deadline.append(element("p", "st-incident-check-context", "Към последната проверка"));
+  if (view.overdue) {
+    deadline.append(element("p", "st-incident-flag", "Топлофикация все още публикува този запис."));
+  }
+  const position = element("section", "st-incident-position");
+  position.append(element("h2", "", "Място в списъка"));
+  const value = element("p", "st-incident-position-value", "№ " + view.position.position);
+  value.append(element("span", "", " от " + view.position.total));
+  position.append(value);
+  position.append(element("p", "st-incident-position-note", "Подредено по начална дата, от най-старото към най-новото. Редът на отстраняване не е обявен."));
+  overview.append(deadline, position);
+  return overview;
+}
+
+function renderProgress(view) {
+  const section = element("section", "st-incident-progress");
+  section.append(element("h2", "", "Как се промени срокът"));
+  if (view.change) {
+    section.append(element("p", "st-incident-change", view.change));
+    section.append(element("p", "st-incident-change-context", "Спрямо първия срок, който видяхме."));
+  }
+  const observations = element("ol", "st-incident-observations");
+  for (const point of view.observations) {
+    const item = element("li", "st-incident-observation");
+    item.append(element("p", "st-incident-observation-label", point.label));
+    item.append(element("p", "st-incident-observation-date", point.checkedDate));
+    const deadline = element("p", "st-incident-observation-deadline");
+    deadline.append(element("span", "", "Обявен край"));
+    deadline.append(element("strong", "", point.deadline));
+    item.append(deadline);
+    item.append(element("p", "st-incident-observation-remaining", point.remaining));
+    observations.append(item);
+  }
+  section.append(observations);
+  section.append(element("p", "st-incident-history-note", view.historyNote));
+  return section;
+}
+
+function renderMore(incident, observedAt, view) {
+  const more = element("details", "st-incident-more");
+  more.append(element("summary", "", "Още подробности"));
+  const dates = element("dl", "st-incident-dates");
+  dates.append(element("dt", "", "Обявено начало"));
+  dates.append(element("dd", "", view.reportedStart));
+  dates.append(element("dt", "", "Първа проверка при нас"));
+  dates.append(element("dd", "", view.firstObserved));
+  more.append(dates);
+  const age = formatIncidentAge(incident, observedAt);
+  if (age) {
+    more.append(element("p", "st-incident-age", age));
+  }
+  if (view.changedStart) {
+    more.append(element("p", "st-incident-flag", view.changedStart));
+  }
+  more.append(element("p", "st-incident-history-note", "Нямаме данни за предишните места в списъка."));
+  return more;
+}
+
+export function startIncidentPage() {
+  const page = document.getElementById("incident-page");
+  const detail = document.getElementById("incident-detail");
+  if (!page || !detail) {
+    return;
+  }
+  let id = page.dataset.incidentId;
+  if (!id) {
+    try {
+      const root = new URL(document.baseURI).pathname;
+      const route = window.location.pathname.slice(root.length);
+      const match = /^incident\/([A-Za-z0-9_-]+)\/$/.exec(route);
+      if (match) {
+        const binary = atob(match[1].replace(/-/g, "+").replace(/_/g, "/"));
+        id = new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(binary, (character) => {
+          return character.charCodeAt(0);
+        }));
+      }
+    } catch {
+      id = null;
+    }
+  }
+  if (!id) {
+    detail.replaceChildren(element("p", "", "Тази страница не е намерена."));
+    return;
+  }
+  let snapshot = null;
+  let pending = false;
+
+  function render() {
+    const incident = snapshot.incidents.find((entry) => {
+      return entry.id === id;
+    });
+    const observed = document.getElementById("incident-page-observed");
+    observed.textContent = "Последна проверка: " + formatObservedLabel(snapshot.observedAt).replace(/^към /, "") + ".";
+    observed.dateTime = snapshot.observedAt;
+    if (!incident) {
+      detail.replaceChildren(element("p", "st-incident-unlisted", "Записът вече не е в текущия списък на Топлофикация. Няма потвърждение за приключване."));
+      return;
+    }
+    document.getElementById("incident-page-heading").textContent = incident.name;
+    const view = getIncidentDetailView(incident, snapshot);
+    document.getElementById("incident-page-type").textContent = view.type;
+    document.getElementById("incident-page-addresses").textContent = view.addresses;
+    detail.replaceChildren(renderOverview(view), renderProgress(view), renderMore(incident, snapshot.observedAt, view));
+  }
+
+  function accept(value) {
+    const next = normalizeIncidents(value);
+    if (snapshot && Date.parse(next.observedAt) < Date.parse(snapshot.observedAt)) {
+      return;
+    }
+    snapshot = next;
+    render();
+  }
+
+  async function refresh() {
+    if (pending || document.hidden) {
+      return;
+    }
+    pending = true;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      controller.abort();
+    }, 10000);
+    try {
+      const response = await fetch(new URL("./incidents.json", document.baseURI), { cache: "no-store", signal: controller.signal });
+      if (!response.ok) {
+        throw new Error("Incident listing unavailable");
+      }
+      accept(await response.json());
+      document.getElementById("incident-page-notice").textContent = "";
+    } catch {
+      document.getElementById("incident-page-notice").textContent = snapshot
+        ? "Не успяхме да обновим данните. Показваме последния запазен списък от проверката по-горе."
+        : "Данните временно не са достъпни.";
+    } finally {
+      window.clearTimeout(timeout);
+      pending = false;
+    }
+  }
+
+  try {
+    accept(JSON.parse(document.getElementById("initial-incidents").textContent));
+  } catch {
+    // Keep the initial HTML available if its bootstrap cannot be read.
+  }
+  refresh();
+  document.addEventListener("visibilitychange", refresh);
+  window.setInterval(refresh, 60000);
 }
 
 export function startIncidents() {
@@ -286,11 +456,25 @@ export function startIncidents() {
       return typeSelect.value === "all" || incident.type === typeSelect.value;
     });
     const incidents = sortIncidents(matching, sortSelect.value);
+    const focused = list.contains(document.activeElement) ? document.activeElement : null;
+    const focusedId = focused?.closest(".st-incident")?.dataset.incidentId;
+    const focusedAction = focused?.dataset.action;
     const fragment = document.createDocumentFragment();
-    for (const incident of incidents) {
-      fragment.append(renderIncident(incident, snapshot.observedAt));
+    for (const [index, incident] of incidents.entries()) {
+      fragment.append(renderIncident(incident, snapshot.observedAt, index + 1));
     }
     list.replaceChildren(fragment);
+    if (focusedId) {
+      const item = [...list.children].find((entry) => {
+        return entry.dataset.incidentId === focusedId;
+      });
+      const target = item?.querySelector('[data-action="' + focusedAction + '"]');
+      if (target) {
+        target.focus({ preventScroll: true });
+      } else {
+        sortSelect.focus({ preventScroll: true });
+      }
+    }
     const accidents = snapshot.incidents.filter((incident) => {
       return incident.type === "accident";
     }).length;
@@ -344,11 +528,15 @@ export function startIncidents() {
     }
   }
 
-  openButton.addEventListener("click", () => {
+  function openList() {
     renderList();
-    dialog.showModal();
+    if (!dialog.open) {
+      dialog.showModal();
+    }
     refreshData();
-  });
+  }
+
+  openButton.addEventListener("click", openList);
   closeButton.addEventListener("click", () => {
     dialog.close();
   });
@@ -368,6 +556,9 @@ export function startIncidents() {
       updateNotice();
     }
   }
+  if (window.location?.hash === "#incidents") {
+    openList();
+  }
   refreshData();
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
@@ -385,4 +576,5 @@ export function startIncidents() {
 
 if (typeof document !== "undefined") {
   startIncidents();
+  startIncidentPage();
 }

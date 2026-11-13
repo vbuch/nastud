@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildSite, fetchIncidents, fetchTimeline, getIncidentsUrl } from "../build.mjs";
 import { normalizeTimeline, presentation, serializeData } from "../data.mjs";
+import { getIncidentPath } from "../src/incident-history.js";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/timeline.json", import.meta.url), "utf8"));
 const incidents = JSON.parse(await readFile(new URL("./fixtures/incidents.json", import.meta.url), "utf8"));
@@ -269,6 +270,107 @@ test("keeps timelines with no weather compatible and builds the unavailable stat
     assert.equal(timeline.weather, null);
     assert.equal(timeline.current, null);
     assert.equal(values.count, "?");
+  } finally {
+    await rm(outDirectory, { recursive: true, force: true });
+  }
+});
+
+test("publishes stable incident pages with escaped metadata, prefixed canonical URLs and both PNG formats", async () => {
+  const outDirectory = await mkdtemp(join(tmpdir(), "nastud-incident-pages-"));
+  const input = structuredClone(incidents);
+  input.incidents[0].id = '../Изток/"</script>';
+  input.incidents[0].name = 'Част от Изток "<img src=x onerror=alert(1)>"';
+  input.incidents[0].addresses = 'ул. "Тинтява" №5 </script>';
+  const path = getIncidentPath(input.incidents[0].id);
+  try {
+    await buildSite({ data: fixture, incidents: input, outDirectory, siteUrl: "https://example.com/preview/" });
+    const html = await readFile(join(outDirectory, path, "index.html"), "utf8");
+    const canonical = "https://example.com/preview/" + path;
+    const bootstrap = /<script id="initial-incidents" type="application\/json">([\s\S]*?)<\/script>/.exec(html);
+
+    assert.match(path, /^incident\/[A-Za-z0-9_-]+\/$/);
+    assert.ok(html.includes('<link rel="canonical" href="' + canonical + '">'));
+    assert.ok(html.includes('<meta property="og:url" content="' + canonical + '">'));
+    assert.ok(html.includes('<meta property="og:image" content="' + canonical + 'share.png?v='));
+    assert.match(html, /<base href="\.\.\/\.\.\/">/);
+    assert.match(html, /class="st-incident-position-value">№ 1<span> от 3<\/span>/);
+    assert.match(html, /2026-11-11T15:00:00\.000Z/);
+    assert.ok(html.includes('ул. &quot;Тинтява&quot; №5 &lt;/script&gt;'));
+    assert.equal(html.includes("<img src=x"), false);
+    assert.equal(html.includes("{{"), false);
+    assert.equal(JSON.parse(bootstrap[1]).incidents[0].id, input.incidents[0].id);
+    assert.match(html, /id="incident-page-type">Авария<\/p>/);
+    assert.match(html, /id="incident-page-addresses">ул\. &quot;Тинтява&quot; №5 &lt;\/script&gt;<\/p>/);
+    assert.match(html, /class="st-incident-due-date">15 ноември 2026 г\.<\/p>/);
+    assert.match(html, /<h2>Как се промени срокът<\/h2>/);
+    assert.match(html, /При първата ни проверка/);
+    assert.match(html, /При последната проверка/);
+    assert.match(html, /class="st-incident-more">\s*<summary>Още подробности<\/summary>/);
+    assert.ok(html.indexOf('class="st-incident-deadline-card"') < html.indexOf('class="st-incident-position"'));
+    assert.equal(html.includes('id="incident-share"'), false);
+    assert.equal(html.includes('class="st-incident-progress-chart"'), false);
+    assert.equal(html.includes('class="st-incident-progress-table"'), false);
+    assert.ok((await readFile(join(outDirectory, "sitemap.xml"), "utf8")).includes(canonical));
+    for (const [name, height] of [["share.png", 630], ["share-square.png", 1200]]) {
+      const png = await readFile(join(outDirectory, path, name));
+      assert.equal(png.subarray(1, 4).toString(), "PNG");
+      assert.equal(png.readUInt32BE(16), 1200);
+      assert.equal(png.readUInt32BE(20), height);
+    }
+    const fallback = await readFile(join(outDirectory, "404.html"), "utf8");
+    assert.match(fallback, /<base href="\/preview\/">/);
+    assert.match(fallback, /name="robots" content="noindex,follow"/);
+    assert.match(fallback, /data-incident-id=""/);
+    assert.equal(JSON.parse(/<script id="initial-incidents" type="application\/json">([\s\S]*?)<\/script>/.exec(fallback)[1]).observedAt, input.observedAt);
+  } finally {
+    await rm(outDirectory, { recursive: true, force: true });
+  }
+});
+
+test("keeps an incident-route fallback in a publication with a verified empty listing", async () => {
+  const outDirectory = await mkdtemp(join(tmpdir(), "nastud-incident-empty-"));
+  try {
+    await buildSite({ data: fixture, incidents: { ...incidents, count: 0, incidents: [] }, outDirectory });
+    const fallback = await readFile(join(outDirectory, "404.html"), "utf8");
+    const bootstrap = /<script id="initial-incidents" type="application\/json">([\s\S]*?)<\/script>/.exec(fallback);
+    assert.equal(JSON.parse(bootstrap[1]).count, 0);
+    assert.match(fallback, /id="incident-page"/);
+    assert.match(fallback, /id="incident-page-notice"/);
+  } finally {
+    await rm(outDirectory, { recursive: true, force: true });
+  }
+});
+
+test("reconciles generated incident pages and fallback when rebuilding the same output directory", async () => {
+  const outDirectory = await mkdtemp(join(tmpdir(), "nastud-incident-rebuild-"));
+  const removedPath = getIncidentPath(incidents.incidents[0].id);
+  const retainedPath = getIncidentPath(incidents.incidents[2].id);
+  const nextListing = {
+    ...incidents,
+    count: 2,
+    observedAt: "2026-11-11T15:30:00.000Z",
+    incidents: incidents.incidents.slice(1),
+  };
+  try {
+    await buildSite({ data: fixture, incidents, outDirectory });
+    await writeFile(join(outDirectory, "keep.txt"), "Keep unrelated output.");
+    assert.ok(await stat(join(outDirectory, removedPath, "share-square.png")));
+
+    await buildSite({ data: fixture, incidents: nextListing, outDirectory });
+    for (const filename of ["index.html", "share.png", "share-square.png"]) {
+      await assert.rejects(readFile(join(outDirectory, removedPath, filename)), { code: "ENOENT" });
+    }
+    assert.match(await readFile(join(outDirectory, retainedPath, "index.html"), "utf8"), /class="st-incident-position-value">№ 1<span> от 2<\/span>/);
+    const fallback = await readFile(join(outDirectory, "404.html"), "utf8");
+    const bootstrap = /<script id="initial-incidents" type="application\/json">([\s\S]*?)<\/script>/.exec(fallback);
+    assert.equal(JSON.parse(bootstrap[1]).count, 2);
+    assert.equal(JSON.parse(bootstrap[1]).observedAt, nextListing.observedAt);
+
+    await buildSite({ data: fixture, incidents: null, outDirectory });
+    await assert.rejects(stat(join(outDirectory, "incident")), { code: "ENOENT" });
+    await assert.rejects(readFile(join(outDirectory, "404.html")), { code: "ENOENT" });
+    assert.equal(await readFile(join(outDirectory, "keep.txt"), "utf8"), "Keep unrelated output.");
+    assert.ok(await stat(join(outDirectory, "assets", "SofiaSans.ttf")));
   } finally {
     await rm(outDirectory, { recursive: true, force: true });
   }

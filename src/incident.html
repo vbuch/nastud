@@ -1,0 +1,54 @@
+<!doctype html>
+<html class="st-incident-document" lang="bg">
+  <head>
+    <meta charset="utf-8">
+    <base href="{{BASE_URL}}">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>{{META_TITLE}}</title>
+    <meta name="description" content="{{META_DESCRIPTION}}">
+    <meta name="theme-color" content="#25282a">
+    <meta name="color-scheme" content="dark">
+    <meta name="robots" content="{{ROBOTS}}">
+    <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+    <link rel="canonical" href="{{CANONICAL_URL}}">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="bg_BG">
+    <meta property="og:site_name" content="На студ">
+    <meta property="og:title" content="{{META_TITLE}}">
+    <meta property="og:description" content="{{META_DESCRIPTION}}">
+    <meta property="og:url" content="{{CANONICAL_URL}}">
+    <meta property="og:image" content="{{OG_IMAGE_URL}}">
+    <meta property="og:image:secure_url" content="{{OG_IMAGE_URL}}">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="{{META_DESCRIPTION}}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{META_TITLE}}">
+    <meta name="twitter:description" content="{{META_DESCRIPTION}}">
+    <meta name="twitter:image" content="{{OG_IMAGE_URL}}">
+    <meta name="twitter:image:alt" content="{{META_DESCRIPTION}}">
+    <link rel="stylesheet" href="./styles.css">
+    <script type="module" src="./incidents.js"></script>
+  </head>
+  <body class="st-incident-page-body">
+    <div id="counter-app">
+      <main class="st-incident-page-shell" id="incident-page" data-incident-id="{{INCIDENT_ID}}">
+        <header class="st-incident-page-header">
+          <a href="./#incidents">Всички аварии и ремонти</a>
+          <h1 id="incident-page-heading">{{INCIDENT_NAME}}</h1>
+          <p class="st-incident-page-type" id="incident-page-type">{{INCIDENT_TYPE}}</p>
+          <p class="st-incident-page-addresses" id="incident-page-addresses">{{INCIDENT_ADDRESSES}}</p>
+          <time class="st-incidents-observed" id="incident-page-observed" datetime="{{OBSERVED_AT}}">Последна проверка: {{OBSERVED_LABEL}}.</time>
+        </header>
+        <p class="st-incidents-notice" id="incident-page-notice" role="status"></p>
+        <div id="incident-detail">{{INITIAL_DETAIL}}</div>
+        <footer class="st-incident-page-footer">
+          <p><a href="https://toplo.bg/accidents-and-maintenance" target="_blank" rel="noopener noreferrer">Виж списъка на Топлофикация</a></p>
+          <p>с данни от <a href="https://oboapp.online" target="_blank" rel="noopener noreferrer">OboApp</a></p>
+        </footer>
+      </main>
+    </div>
+    <script id="initial-incidents" type="application/json">{{INITIAL_INCIDENTS}}</script>
+  </body>
+</html>
