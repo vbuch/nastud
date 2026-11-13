@@ -32,7 +32,7 @@ jobs:
       - name: Test the site
         run: pnpm test
       - name: Build fixture preview
-        run: node build.mjs --data test/fixtures/timeline.json --incidents test/fixtures/incidents.json
+        run: pnpm build:fixture
       - name: Save reviewable preview
         uses: actions/upload-artifact@v4
         with:

@@ -1,0 +1,193 @@
+{
+  "sourceType": "toplo-bg",
+  "locality": "bg.sofia",
+  "startDate": "2026-10-29",
+  "endDate": "2026-11-11",
+  "daily": [
+    {
+      "date": "2026-10-29",
+      "snapshot": null
+    },
+    {
+      "date": "2026-10-30",
+      "snapshot": null
+    },
+    {
+      "date": "2026-10-31",
+      "snapshot": null
+    },
+    {
+      "date": "2026-11-01",
+      "snapshot": null
+    },
+    {
+      "date": "2026-11-02",
+      "snapshot": null
+    },
+    {
+      "date": "2026-11-03",
+      "snapshot": null
+    },
+    {
+      "date": "2026-11-04",
+      "snapshot": null
+    },
+    {
+      "date": "2026-11-05",
+      "snapshot": null
+    },
+    {
+      "date": "2026-11-06",
+      "snapshot": null
+    },
+    {
+      "date": "2026-11-07",
+      "snapshot": null
+    },
+    {
+      "date": "2026-11-08",
+      "snapshot": {
+        "sourceType": "toplo-bg",
+        "locality": "bg.sofia",
+        "sourceUrl": "https://toplo.bg/accidents-and-maintenance",
+        "observedAt": "2026-11-08T19:40:00Z",
+        "count": 0,
+        "incidents": []
+      }
+    },
+    {
+      "date": "2026-11-09",
+      "snapshot": {
+        "sourceType": "toplo-bg",
+        "locality": "bg.sofia",
+        "sourceUrl": "https://toplo.bg/accidents-and-maintenance",
+        "observedAt": "2026-11-09T20:10:00Z",
+        "count": 2,
+        "incidents": [
+          {
+            "id": "oldest",
+            "accidentId": "earlier-oldest-listing",
+            "name": "Част от Яворов",
+            "addresses": "ул. „Цар Иван Асен II“ №40 и №42",
+            "type": "accident",
+            "status": 1,
+            "reportedStart": "2025-11-04T15:00:00Z",
+            "estimatedEnd": null,
+            "createdAt": "2025-11-04T13:20:00Z",
+            "firstObservedAt": "2026-02-06T19:01:00.000Z",
+            "firstReportedStart": "2025-11-04T15:00:00.000Z",
+            "firstEstimatedEnd": "2026-02-27T20:00:00.000Z"
+          },
+          {
+            "id": "repair",
+            "accidentId": "earlier-repair-listing",
+            "name": "Част от Изток",
+            "addresses": "ул. „Тинтява“ №5",
+            "type": "repair",
+            "status": 1,
+            "reportedStart": "2026-11-10T13:30:00Z",
+            "estimatedEnd": "2026-11-24T23:59:00Z",
+            "createdAt": "2026-09-17T06:27:00Z",
+            "firstObservedAt": "2026-09-17T06:31:00.000Z",
+            "firstReportedStart": "2026-09-17T09:15:00.000Z",
+            "firstEstimatedEnd": "2026-09-19T09:15:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-11-10",
+      "snapshot": {
+        "sourceType": "toplo-bg",
+        "locality": "bg.sofia",
+        "sourceUrl": "https://toplo.bg/accidents-and-maintenance",
+        "observedAt": "2026-11-10T19:35:00Z",
+        "count": 2,
+        "incidents": [
+          {
+            "id": "historical-only",
+            "accidentId": "historical-only-listing",
+            "name": "Предишен запис",
+            "addresses": "ул. „Оборище“ №7",
+            "type": "accident",
+            "status": 1,
+            "reportedStart": "2024-11-01T12:00:00Z",
+            "estimatedEnd": "2026-11-10T18:00:00Z",
+            "createdAt": "2025-11-04T13:20:00Z",
+            "firstObservedAt": "2026-11-09T12:00:00Z",
+            "firstReportedStart": "2025-11-04T15:00:00.000Z",
+            "firstEstimatedEnd": "2026-02-27T20:00:00.000Z"
+          },
+          {
+            "id": "oldest",
+            "accidentId": "yesterday-oldest-listing",
+            "name": "Част от Яворов",
+            "addresses": "ул. „Цар Иван Асен II“ №42",
+            "type": "accident",
+            "status": 1,
+            "reportedStart": "2025-11-04T15:00:00Z",
+            "estimatedEnd": "2026-11-14T20:00:00Z",
+            "createdAt": "2025-11-04T13:20:00Z",
+            "firstObservedAt": "2026-02-06T19:01:00.000Z",
+            "firstReportedStart": "2025-11-04T15:00:00.000Z",
+            "firstEstimatedEnd": "2026-02-27T20:00:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-11-11",
+      "snapshot": {
+        "sourceType": "toplo-bg",
+        "locality": "bg.sofia",
+        "sourceUrl": "https://toplo.bg/accidents-and-maintenance",
+        "observedAt": "2026-11-11T15:00:00.000Z",
+        "count": 3,
+        "incidents": [
+          {
+            "id": "oldest",
+            "accidentId": "oldest-accident",
+            "name": "Част от Яворов",
+            "addresses": "ул. „Цар Иван Асен II“ №42",
+            "type": "accident",
+            "status": 1,
+            "reportedStart": "2025-11-04T15:00:00Z",
+            "estimatedEnd": "2026-11-15T20:00:00Z",
+            "createdAt": "2025-11-04T13:20:00Z",
+            "firstObservedAt": "2026-02-06T19:01:00.000Z",
+            "firstReportedStart": "2025-11-04T15:00:00.000Z",
+            "firstEstimatedEnd": "2026-02-27T20:00:00.000Z"
+          },
+          {
+            "id": "newer",
+            "accidentId": "newer-accident",
+            "name": "Част от Младост 1",
+            "addresses": "бл. 1, 2А, 7, 8, 9, 11",
+            "type": "accident",
+            "status": 1,
+            "reportedStart": "2026-11-11T10:25:00Z",
+            "estimatedEnd": "2026-11-13T10:25:00Z",
+            "createdAt": "2026-11-11T08:00:00Z",
+            "firstObservedAt": "2026-11-11T08:30:00.000Z",
+            "firstReportedStart": "2026-11-11T10:25:00.000Z",
+            "firstEstimatedEnd": "2026-11-13T10:25:00.000Z"
+          },
+          {
+            "id": "repair",
+            "accidentId": "repair-accident",
+            "name": "Част от Изток",
+            "addresses": "ул. „Тинтява“ №5",
+            "type": "repair",
+            "status": 1,
+            "reportedStart": "2026-11-10T13:30:00Z",
+            "estimatedEnd": "2026-11-23T23:59:00Z",
+            "createdAt": "2026-09-17T06:27:00Z",
+            "firstObservedAt": "2026-09-17T06:31:00.000Z",
+            "firstReportedStart": "2026-09-17T09:15:00.000Z",
+            "firstEstimatedEnd": "2026-09-19T09:15:00.000Z"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -6,6 +6,36 @@ import { startIncidentPage, startIncidents } from "../src/incidents.js";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/incidents.json", import.meta.url), "utf8"));
 
+function dailyHistory() {
+  const previous = structuredClone(fixture);
+  previous.observedAt = "2026-11-10T20:30:00Z";
+  previous.incidents[2].estimatedEnd = "2026-11-22T23:59:00Z";
+  return {
+    sourceType: "toplo-bg",
+    locality: "bg.sofia",
+    startDate: "2026-11-09",
+    endDate: "2026-11-11",
+    daily: [
+      { date: "2026-11-09", snapshot: null },
+      { date: "2026-11-10", snapshot: previous },
+      { date: "2026-11-11", snapshot: fixture },
+    ],
+  };
+}
+
+function findNode(root, predicate) {
+  if (predicate(root)) {
+    return root;
+  }
+  for (const child of root.children) {
+    const found = findNode(child, predicate);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 class Node {
   constructor(tagName = "div") {
     this.tagName = tagName;
@@ -99,7 +129,7 @@ function replaceGlobal(context, name, value) {
   });
 }
 
-function pageHarness(context, response) {
+function pageHarness(context, response, history = null) {
   const elements = new Map();
   for (const id of [
     "incident-page",
@@ -110,11 +140,13 @@ function pageHarness(context, response) {
     "incident-page-observed",
     "incident-page-notice",
     "initial-incidents",
+    "initial-incident-daily",
   ]) {
     elements.set(id, new Node());
   }
   elements.get("incident-page").dataset.incidentId = "repair";
   elements.get("initial-incidents").textContent = JSON.stringify(fixture);
+  elements.get("initial-incident-daily").textContent = JSON.stringify(history);
   const intervals = [];
   replaceGlobal(context, "document", {
     hidden: false,
@@ -217,6 +249,129 @@ test("a failed detail refresh preserves the saved values and their original time
   assert.equal(elements.get("incident-detail").textContent, initial);
   assert.equal(elements.get("incident-page-observed").dateTime, fixture.observedAt);
   assert.match(elements.get("incident-page-notice").textContent, /последния запазен/);
+});
+
+test("daily history has an accessible chronological table and exact dated comparisons", async (context) => {
+  const history = dailyHistory();
+  const requested = [];
+  const { elements } = pageHarness(context, async (url) => {
+    requested.push(url.href);
+    return Response.json(url.pathname.endsWith("incident-daily.json") ? history : fixture);
+  }, history);
+
+  startIncidentPage();
+  await setImmediate();
+
+  const detail = elements.get("incident-detail");
+  const table = findNode(detail, (node) => {
+    return node.tagName === "table";
+  });
+  assert.ok(table);
+  assert.match(table.textContent, /Промени в мястото и обявения срок/);
+  assert.doesNotMatch(table.textContent, /Няма дневна проверка|09\.11\.2026/);
+  assert.match(detail.textContent, /От 10\.11\.2026 г\. до 11\.11\.2026 г\./);
+  assert.match(detail.textContent, /Обявеният срок е с 1 ден по-късен/);
+  const body = table.children.find((node) => {
+    return node.tagName === "tbody";
+  });
+  assert.equal(body.children.length, 2);
+  assert.equal(body.children[0].dataset.historyState, "present");
+  const time = findNode(body.children[0], (node) => {
+    return node.tagName === "time";
+  });
+  assert.equal(time.dateTime, "2026-11-10T20:30:00Z");
+  assert.equal(body.children[0].children[0].attributes.scope, "row");
+  assert.deepEqual(requested.sort(), [
+    "https://example.com/nastud/incident-daily.json",
+    "https://example.com/nastud/incidents.json",
+  ]);
+});
+
+test("a daily history failure preserves saved captures while allowing a newer incident check", async (context) => {
+  const history = dailyHistory();
+  const next = structuredClone(fixture);
+  next.observedAt = "2026-11-11T16:30:00Z";
+  next.incidents[2].estimatedEnd = "2026-11-24T23:59:00Z";
+  const { elements } = pageHarness(context, async (url) => {
+    if (url.pathname.endsWith("incident-daily.json")) {
+      throw new Error("Daily history unavailable");
+    }
+    return Response.json(next);
+  }, history);
+
+  startIncidentPage();
+  await setImmediate();
+
+  assert.equal(elements.get("incident-page-observed").dateTime, next.observedAt);
+  assert.match(elements.get("incident-detail").textContent, /Обявеният срок е с 2 дни по-късен/);
+  assert.match(elements.get("incident-detail").textContent, /22:30 ч\./);
+  assert.match(elements.get("incident-page-notice").textContent, /запазените дневни проверки/);
+});
+
+test("unchanged checks do not add rows and the previous-day comparison remains available", async (context) => {
+  const history = dailyHistory();
+  history.daily[1].snapshot.incidents[2].estimatedEnd = fixture.incidents[2].estimatedEnd;
+  const { elements } = pageHarness(context, async (url) => {
+    return Response.json(url.pathname.endsWith("incident-daily.json") ? history : fixture);
+  }, history);
+
+  startIncidentPage();
+  await setImmediate();
+
+  const detail = elements.get("incident-detail");
+  const body = findNode(detail, (node) => {
+    return node.tagName === "tbody";
+  });
+  assert.equal(body.children.length, 1);
+  assert.match(body.children[0].textContent, /10\.11\.2026/);
+  assert.doesNotMatch(body.children[0].textContent, /11\.11\.2026/);
+  assert.match(detail.textContent, /Период: 10\.11\.2026 г\. до 11\.11\.2026 г\./);
+  assert.match(detail.textContent, /От 10\.11\.2026 г\. до 11\.11\.2026 г\./);
+  assert.match(detail.textContent, /Обявеният срок е без промяна/);
+});
+
+test("older daily captures cannot replace saved checks or the current snapshot", async (context) => {
+  const history = dailyHistory();
+  const older = structuredClone(history);
+  older.daily[1].snapshot.observedAt = "2026-11-10T10:30:00Z";
+  older.daily[1].snapshot.incidents[2].estimatedEnd = "2026-11-30T23:59:00Z";
+  older.daily[2].snapshot.observedAt = "2026-11-11T10:00:00Z";
+  const { elements } = pageHarness(context, async (url) => {
+    return Response.json(url.pathname.endsWith("incident-daily.json") ? older : fixture);
+  }, history);
+
+  startIncidentPage();
+  await setImmediate();
+
+  const content = elements.get("incident-detail").textContent;
+  assert.match(content, /Обявеният срок е с 1 ден по-късен/);
+  assert.match(content, /22:30 ч\./);
+  assert.doesNotMatch(content, /30\.11\.2026/);
+  assert.equal(elements.get("incident-page-observed").dateTime, fixture.observedAt);
+});
+
+test("a newer listing preserves an open details disclosure and its keyboard focus", async (context) => {
+  const history = dailyHistory();
+  const { elements, intervals } = pageHarness(context, async (url) => {
+    return Response.json(url.pathname.endsWith("incident-daily.json") ? history : fixture);
+  }, history);
+  startIncidentPage();
+  await setImmediate();
+  const detail = elements.get("incident-detail");
+  const disclosure = findNode(detail, (node) => {
+    return node.tagName === "details";
+  });
+  disclosure.open = true;
+  disclosure.children[0].focus();
+
+  intervals[0]();
+  await setImmediate();
+
+  const refreshed = findNode(detail, (node) => {
+    return node.tagName === "details";
+  });
+  assert.equal(refreshed.open, true);
+  assert.equal(document.activeElement, refreshed.children[0]);
 });
 
 test("a newer complete listing removes an absent incident's position without confirming resolution", async (context) => {

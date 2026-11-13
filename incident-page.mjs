@@ -21,6 +21,7 @@ function renderInitialDetail(incident, snapshot, view) {
       <p class="st-incident-observation-remaining">${escapeHtml(observation.remaining)}</p>
     </li>`;
   }).join("");
+  const daily = renderInitialDaily(view.daily);
   return `<div class="st-incident-overview">
     <section class="st-incident-deadline-card">
       <h2>Обявен срок</h2>
@@ -41,6 +42,7 @@ function renderInitialDetail(incident, snapshot, view) {
     <ol class="st-incident-observations">${observations}</ol>
     <p class="st-incident-history-note">${escapeHtml(view.historyNote)}</p>
   </section>
+  ${daily}
   <details class="st-incident-more">
     <summary>Още подробности</summary>
     <dl class="st-incident-dates">
@@ -49,11 +51,40 @@ function renderInitialDetail(incident, snapshot, view) {
     </dl>
     ${age === null ? "" : '<p class="st-incident-age">' + escapeHtml(age) + "</p>"}
     ${view.changedStart === null ? "" : '<p class="st-incident-flag">' + escapeHtml(view.changedStart) + "</p>"}
-    <p class="st-incident-history-note">Нямаме данни за предишните места в списъка.</p>
+    ${view.daily ? "" : '<p class="st-incident-history-note">Нямаме данни за предишните места в списъка.</p>'}
   </details>`;
 }
 
-export async function buildIncidentPages({ snapshot, canonical, outDirectory, now = new Date() }) {
+function renderInitialDaily(view) {
+  if (!view) {
+    return "";
+  }
+  const rows = view.rows.map((row) => {
+    const check = row.observedAt
+      ? '<time datetime="' + escapeHtml(row.observedAt) + '">' + escapeHtml(row.dateLabel) + '<span>' + escapeHtml(row.checkedTime) + '</span></time>'
+      : escapeHtml(row.dateLabel) + '<span>' + escapeHtml(row.checkedTime) + '</span>';
+    return `<tr data-history-state="${row.state}">
+      <th scope="row">${check}</th>
+      <td>${escapeHtml(row.positionLabel)}</td>
+      <td>${escapeHtml(row.deadlineLabel)}${row.remainingLabel ? '<span>' + escapeHtml(row.remainingLabel) + '</span>' : ""}</td>
+    </tr>`;
+  }).join("");
+  const comparison = view.comparison;
+  return `<section class="st-incident-daily">
+    <h2>Промени по дни</h2>
+    <p class="st-incident-daily-period">Период: ${escapeHtml(view.period)}</p>
+    <p class="st-incident-history-note">Показваме първата дневна проверка, в която записът присъства, и следващите промени в мястото, общия брой или обявения срок. За всеки ден използваме последната запазена пълна проверка за София. Промени в рамките на деня може да липсват.</p>
+    ${comparison ? '<div class="st-incident-daily-comparison"><h3>' + escapeHtml(comparison.label) + '</h3>' + (comparison.position ? '<p>' + escapeHtml(comparison.position) + '</p>' : '') + (comparison.deadline ? '<p>' + escapeHtml(comparison.deadline) + '</p>' : '') + '</div>' : ""}
+    <table class="st-incident-daily-table">
+      <caption>Промени в мястото и обявения срок. Часовете са за София.</caption>
+      <thead><tr><th scope="col">Проверка</th><th scope="col">Място</th><th scope="col">Обявен срок</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p class="st-incident-history-note">„Няма дневна проверка“ означава липсващи подробни данни. Отсъствието от пълен списък не потвърждава приключване.</p>
+  </section>`;
+}
+
+export async function buildIncidentPages({ snapshot, history = null, canonical, outDirectory, now = new Date() }) {
   const outputRoot = resolve(outDirectory);
   const incidentDirectory = resolve(outputRoot, "incident");
   if (dirname(incidentDirectory) !== outputRoot) {
@@ -70,7 +101,7 @@ export async function buildIncidentPages({ snapshot, canonical, outDirectory, no
   for (let index = 0; index < ordered.length; index += 1) {
     const incident = ordered[index];
     const position = index + 1;
-    const view = getIncidentDetailView(incident, snapshot);
+    const view = getIncidentDetailView(incident, snapshot, history);
     const path = getIncidentPath(incident.id);
     const pageUrl = new URL(path, canonical);
     const pageDirectory = resolve(outDirectory, path);
@@ -103,6 +134,7 @@ export async function buildIncidentPages({ snapshot, canonical, outDirectory, no
       OBSERVED_LABEL: escapeHtml(formatObservedLabel(snapshot.observedAt, now).replace(/^към /, "")),
       INITIAL_DETAIL: renderInitialDetail(incident, snapshot, view),
       INITIAL_INCIDENTS: serializeData(snapshot),
+      INITIAL_INCIDENT_DAILY: serializeData(history),
     };
     const html = template.replace(/\{\{([A-Z_]+)\}\}/g, (match, name) => {
       if (!(name in tokens)) {
@@ -136,6 +168,7 @@ export async function buildIncidentPages({ snapshot, canonical, outDirectory, no
     OBSERVED_LABEL: escapeHtml(formatObservedLabel(snapshot.observedAt, now).replace(/^към /, "")),
     INITIAL_DETAIL: '<p class="st-incident-unlisted">Този адрес няма страница в текущата публикация. <a href="./">Виж всички аварии и ремонти.</a></p>',
     INITIAL_INCIDENTS: serializeData(snapshot),
+    INITIAL_INCIDENT_DAILY: serializeData(history),
   };
   const fallback = template.replace(/\{\{([A-Z_]+)\}\}/g, (match, name) => {
     if (!(name in fallbackTokens)) {
