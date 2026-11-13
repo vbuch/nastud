@@ -240,8 +240,33 @@
     padding: 0;
   }
   #counter-app .st-incident {
+    position: relative;
     padding: 22px 0;
     border-bottom: 1px solid var(--st-cover-groove);
+  }
+  #counter-app .st-incident-number {
+    display: inline-block;
+    margin-bottom: 8px;
+    color: var(--st-link);
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  #counter-app .st-incident-link {
+    color: var(--st-ink);
+    text-decoration-color: var(--st-cover-edge);
+    text-underline-offset: 4px;
+  }
+  #counter-app .st-incident-link:hover,
+  #counter-app .st-incident-detail-link:hover {
+    color: var(--st-link);
+  }
+  #counter-app .st-incident-detail-link {
+    display: inline-block;
+    margin-top: 16px;
+    color: var(--st-link);
+    font-size: 14px;
+    text-underline-offset: 4px;
   }
   #counter-app .st-incident-heading {
     display: flex;
@@ -309,6 +334,205 @@
   #counter-app .st-incidents-source a {
     color: var(--st-link);
     text-underline-offset: 3px;
+  }
+  html.st-incident-document,
+  body.st-incident-page-body {
+    overflow: auto;
+    height: auto;
+    min-height: 100%;
+  }
+  #counter-app .st-incident-page-shell {
+    width: min(960px, 100%);
+    margin: auto;
+    padding: clamp(24px, 5vw, 48px) clamp(16px, 5vw, 40px);
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  #counter-app .st-incident-page-shell a {
+    color: var(--st-link);
+    text-underline-offset: 4px;
+    overflow-wrap: anywhere;
+  }
+  #counter-app .st-incident-page-header h1 {
+    margin: 28px 0 8px;
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+  #counter-app .st-incident-page-type {
+    margin: 0 0 4px;
+    color: var(--st-muted);
+    font-size: 15px;
+  }
+  #counter-app .st-incident-page-addresses {
+    margin: 0 0 14px;
+    font-size: 18px;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+  #counter-app .st-incident-page-type:empty,
+  #counter-app .st-incident-page-addresses:empty {
+    display: none;
+  }
+  #counter-app .st-incident-page-header .st-incidents-observed {
+    font-size: 14px;
+  }
+  #counter-app .st-incident-overview {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: 16px;
+    margin-top: 28px;
+  }
+  #counter-app .st-incident-deadline-card,
+  #counter-app .st-incident-position {
+    min-width: 0;
+    padding: 24px;
+    border: 1px solid var(--st-cover-groove);
+    border-radius: 8px;
+  }
+  #counter-app .st-incident-deadline-card {
+    border-color: var(--st-cover-edge);
+    background: var(--st-road);
+  }
+  #counter-app .st-incident-deadline-card h2,
+  #counter-app .st-incident-position h2 {
+    margin: 0 0 12px;
+    color: var(--st-muted);
+    font-size: 16px;
+    font-weight: 400;
+  }
+  #counter-app .st-incident-due-date {
+    margin: 0;
+    font-size: clamp(26px, 3.2vw, 34px);
+    line-height: 1.25;
+    font-weight: 500;
+  }
+  #counter-app .st-incident-remaining {
+    margin: 12px 0 4px;
+    color: var(--st-link);
+    font-size: 19px;
+  }
+  #counter-app .st-incident-check-context,
+  #counter-app .st-incident-position-note {
+    margin: 8px 0 0;
+    color: var(--st-muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  #counter-app .st-incident-position-value {
+    margin: 0;
+    font-size: 40px;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+  #counter-app .st-incident-position-value span {
+    color: var(--st-muted);
+    font-size: 20px;
+  }
+  #counter-app .st-incident-progress {
+    padding-block: 32px 24px;
+  }
+  #counter-app .st-incident-progress h2 {
+    margin: 0 0 16px;
+    font-size: 24px;
+    font-weight: 500;
+  }
+  #counter-app .st-incident-change {
+    margin: 0;
+    color: var(--st-link);
+    font-size: 23px;
+    line-height: 1.35;
+  }
+  #counter-app .st-incident-change-context {
+    margin: 4px 0 20px;
+    color: var(--st-muted);
+    font-size: 15px;
+  }
+  #counter-app .st-incident-observations {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  #counter-app .st-incident-observation {
+    min-width: 0;
+    padding: 20px;
+    border-left: 3px solid var(--st-temperature);
+    background: var(--st-road);
+  }
+  #counter-app .st-incident-observation:last-child {
+    border-color: var(--st-cover-edge);
+  }
+  #counter-app .st-incident-observation-label {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 500;
+  }
+  #counter-app .st-incident-observation-date {
+    display: block;
+    margin: 4px 0 0;
+    color: var(--st-muted);
+    font-size: 15px;
+  }
+  #counter-app .st-incident-observation-deadline {
+    margin: 20px 0 8px;
+  }
+  #counter-app .st-incident-observation-deadline span {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--st-muted);
+    font-size: 14px;
+  }
+  #counter-app .st-incident-observation-deadline strong {
+    font-size: 21px;
+    line-height: 1.35;
+    font-weight: 500;
+  }
+  #counter-app .st-incident-observation-remaining {
+    margin: 0;
+    font-size: 16px;
+  }
+  #counter-app .st-incident-history-note {
+    margin: 16px 0 0;
+    color: var(--st-muted);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  #counter-app .st-incident-more {
+    padding: 18px 0;
+    border-block: 1px solid var(--st-cover-groove);
+  }
+  #counter-app .st-incident-more summary {
+    padding: 4px 0;
+    color: var(--st-link);
+    cursor: pointer;
+    font-size: 17px;
+  }
+  #counter-app .st-incident-more .st-incident-dates,
+  #counter-app .st-incident-more .st-incident-age,
+  #counter-app .st-incident-more .st-incident-flag {
+    font-size: 15px;
+  }
+  #counter-app .st-incident-page-footer {
+    padding-top: 16px;
+    color: var(--st-muted);
+    font-size: 14px;
+  }
+  @media (max-width: 680px) {
+    #counter-app .st-incident-overview,
+    #counter-app .st-incident-observations {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
+    }
+    #counter-app .st-incident-deadline-card,
+    #counter-app .st-incident-position {
+      padding: 20px;
+    }
+    #counter-app .st-incident-position-value {
+      font-size: 32px;
+    }
   }
   #counter-app .st-content {
     min-width: 0;

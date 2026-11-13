@@ -7,6 +7,7 @@ import { escapeHtml, normalizeTimeline, presentation, serializeData, sofiaDate }
 import { renderShareImage } from "./share-image.mjs";
 import { normalizeIncidents } from "./src/incidents.js";
 import { fetchWeather } from "./weather.mjs";
+import { buildIncidentPages } from "./incident-page.mjs";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 
@@ -137,8 +138,17 @@ export async function buildSite({
     throw new Error("Unresolved page template token");
   }
   await mkdir(outDirectory, { recursive: true });
-  await cp(resolve(directory, "src"), outDirectory, { recursive: true });
+  await cp(resolve(directory, "src"), outDirectory, {
+    recursive: true,
+    filter: (source) => {
+      return source !== resolve(directory, "src/incident.html");
+    },
+  });
   await cp(resolve(directory, "assets"), resolve(outDirectory, "assets"), { recursive: true });
+  const incidentPages = await buildIncidentPages({ snapshot: incidentListing, canonical, outDirectory, now });
+  const sitemapUrls = [canonical.href, ...incidentPages].map((url) => {
+    return "<url><loc>" + escapeHtml(url) + "</loc></url>";
+  }).join("");
   await Promise.all([
     writeFile(resolve(outDirectory, "index.html"), html),
     writeFile(resolve(outDirectory, "timeline.json"), JSON.stringify(timeline)),
@@ -148,7 +158,7 @@ export async function buildSite({
     writeFile(resolve(outDirectory, ".nojekyll"), ""),
     writeFile(resolve(outDirectory, "CNAME"), canonical.hostname + "\n"),
     writeFile(resolve(outDirectory, "robots.txt"), "User-agent: *\nAllow: /\nSitemap: " + new URL("sitemap.xml", canonical).href + "\n"),
-    writeFile(resolve(outDirectory, "sitemap.xml"), '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>' + escapeHtml(canonical.href) + "</loc></url></urlset>"),
+    writeFile(resolve(outDirectory, "sitemap.xml"), '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + sitemapUrls + "</urlset>"),
   ]);
   console.log("Counter built with " + timeline.daily.length + " daily points.");
   return { timeline, incidents: incidentListing, values, html, imageName, outDirectory };

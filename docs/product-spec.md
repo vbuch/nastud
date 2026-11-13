@@ -56,6 +56,7 @@ deadline extensions.
 - Offer four sorts: oldest reported start, largest net deadline extension, newest reported start and earliest current estimate. Default to oldest reported start.
 - Sort missing comparison values after known values. Retain negative deadline changes as earlier corrections.
 - Use stable secondary ordering for records with equal sort values.
+- Number visible records from 1 in the selected sort and filter. Explain that these numbers follow the displayed list. Link each record's title and detail action to its own shareable page.
 - Each record shows its name, affected addresses, accident or repair type, reported age, reported start, current estimate, first recorded estimate and first capture date when available.
 - Label missing dates and baselines clearly. Do not manufacture estimates.
 - Calculate age in calendar days relative to the snapshot's Sofia date. Display “От посоченото начало: 1 ден” or the plural day count. Use “Началото е в деня на проверката.” for the same calendar day and “Посоченото начало е след датата на проверката.” for a future start. Keep the underlying future age at zero, and omit the age when the start is unknown. Explain the reference date once in the dialog.
@@ -66,6 +67,24 @@ deadline extensions.
 - Flag a current estimate whose source calendar date has passed while its record remains listed.
 - Keep records with passed estimates in the list until the provider's current listing removes them.
 - Escape and the close button close the dialog. Return keyboard focus to the opener. Offer a source-list link when JavaScript is unavailable.
+- Preserve focus on the same incident action after a successful refresh. If the focused record leaves the list, move focus to the sort control.
+
+## Individual incident pages
+
+- Give each current incident a static page at `incident/{encoded-id}/`, using URL-safe base64 of its UTF-8 stable `id`. Changes to `accidentId`, sort or filters do not change its link.
+- Lead with the incident name, type and affected addresses. Show the original source-check timestamp as “Последна проверка”. Put the announced deadline and days remaining or overdue first in the summary.
+- Show position and total as a smaller secondary card across all current accidents and repairs, sorted by oldest reported start with the same stable tie ordering as the list. Use the plain label “Място в списъка”, explain the date ordering and state that the repair order is unknown.
+- Keep this comparable position independent of the list's selected sort and type filter. A missing incident has no current position.
+- Show the signed calendar days from the source-check date in Sofia to the current estimate's source calendar date. A passed estimate is overdue; an unknown estimate stays unknown.
+- Under “Как се промени срокът”, compare the first and latest checks in two readable cards. Each card separates the check date from the announced deadline and describes days remaining or overdue in ordinary Bulgarian. Show the net difference from the first captured estimate above the cards. Stack cards on narrow screens. Omit the tiny plot and numeric table.
+- Include a short explanation of missing intermediate changes below the comparison. When only the current check is known, say so. Full position history and a deadline burndown require dated detailed captures from OboApp.
+- Keep reported start, age, first check, changed-start warning and unavailable position history under a keyboard-accessible “Още подробности” disclosure. Preserve distinctions between unknown current and first recorded estimates.
+- Use the normal incident URL for browser sharing. Keep the page focused on incident information and omit a dedicated copy-link control.
+- Link back to the complete list using the main page's `#incidents` fragment, which opens the incident dialog on arrival.
+- Refresh the page from the same public incident snapshot as the main list. Preserve a newer snapshot and its timestamp after an older or failed refresh.
+- When a newer complete listing omits the incident, remove its current position and say it is no longer listed. Listing removal does not confirm resolution.
+- Publish a custom 404 incident shell so previously shared incident paths can check the current listing after their static page is removed by a later publication. Keep ordinary unknown routes understandable and link back to the main view.
+- Keep the detail page scrollable at desktop and phone widths. Supply readable incident details in the initial HTML and give each page its own canonical URL, metadata and landscape and square sharing images.
 
 ## Data and failure behavior
 

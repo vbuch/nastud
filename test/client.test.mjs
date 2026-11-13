@@ -13,7 +13,31 @@ import {
   getWeatherPoints,
   makeTemperatureAxis,
   makeTimelinePath,
+  startCounter,
 } from "../src/app.js";
+
+test("shared incident page styling does not start the main counter without its controls", (context) => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "document");
+  context.after(() => {
+    if (descriptor) {
+      Object.defineProperty(globalThis, "document", descriptor);
+    } else {
+      delete globalThis.document;
+    }
+  });
+  const document = {
+    getElementById(id) {
+      assert.equal(id, "counter-app");
+      return {
+        querySelector() {
+          return null;
+        },
+      };
+    },
+  };
+  Object.defineProperty(globalThis, "document", { configurable: true, value: document });
+  assert.doesNotThrow(startCounter);
+});
 
 test("shows no generic stale notice for a known snapshot, including a real zero", () => {
   for (const count of [99, 0]) {

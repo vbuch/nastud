@@ -21,7 +21,12 @@ createServer(async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
     response.end(await readFile(path));
   } catch {
-    response.writeHead(404).end("Not found");
+    try {
+      const fallback = await readFile(resolve(root, "404.html"));
+      response.writeHead(404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }).end(fallback);
+    } catch {
+      response.writeHead(404).end("Not found");
+    }
   }
 }).listen(port, "127.0.0.1", () => {
   console.log("Local: http://127.0.0.1:" + port);

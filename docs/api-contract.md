@@ -110,6 +110,63 @@ rate-limit, unsupported-source and storage errors also stop publication. A
 failed publication preserves the prior site. Browser failures preserve the last
 valid local snapshot and its original timestamp.
 
+## Incident position and deadline observations
+
+The current API provides the latest complete incident listing, the first saved
+incident fields and aggregate daily counts. It has no public per-incident
+history endpoint. Aggregate counts do not identify which records were present
+or where an individual record appeared in earlier lists.
+
+Na Stud calculates an incident's canonical position across all current accidents
+and repairs. It sorts by `reportedStart`, oldest first, with unknown starts last.
+Equal starts use the Bulgarian name ordering and then the stable `id` ordering
+from `sortIncidents`. The total is the complete listing count. This position is
+independent of the visitor's selected sort and type filter. It describes the
+website's list order; the source supplies no repair priority.
+
+The incident view uses actual first and current observation timestamps. The
+first point pairs `firstObservedAt` with `firstEstimatedEnd`; the current point
+pairs the listing's `observedAt` with `estimatedEnd`. A missing first observation
+produces no first point. When both timestamps identify the same instant, use the
+current point. Exclude a first observation later than the current capture.
+
+For each known estimate, days remaining are the signed calendar-day difference
+between its source deadline date and the observation's `Europe/Sofia` date.
+Positive values mean days remaining, zero means the same calendar day and
+negative values mean the deadline has passed. This calculation preserves source
+calendar dates and does not depend on 23-hour or 25-hour daylight-saving days.
+A missing estimate stays unknown. The first and current points do not establish
+when a deadline changed between them, so the view keeps intermediate revisions
+unknown. A historical position cannot be derived from the first incident record
+alone because the other records in that capture are unavailable.
+
+### Provider requirements for full incident history
+
+Full position history and a deadline countdown chart need a future OboApp API
+capability. No additional endpoint is assumed by the current build. The provider
+would need to expose:
+
+- Actual `observedAt` timestamps for retained complete listing captures, with
+  source, locality and the complete count for each capture.
+- Each capture's stable incident identities and the recorded `reportedStart`,
+  name and `estimatedEnd`, preserving null values. These fields allow the same
+  canonical ordering and tie rules to be applied to every capture. Alternatively,
+  the provider could return positions calculated with those exact rules together
+  with each capture's count.
+- A clear distinction between a record absent from a verified complete capture
+  and unavailable capture data. Capture gaps remain unknown. Listing removal
+  alone does not confirm restoration of service.
+- A bounded history query with a documented period, ordering and completeness
+  policy. Any pagination must allow the consumer to detect incomplete results.
+  Data must remain scoped to the source and locality and use the normal API key
+  protection during publication.
+
+Deadline points must pair the estimate recorded at each check with that check's
+original timestamp. A first saved baseline can be shown separately when it
+predates retained complete captures. It cannot supply earlier positions or
+missing revisions. OboApp owns capture retention and this API extension; Na Stud
+would validate and publish the supplied public history.
+
 ## Published temperature data
 
 Na Stud adds optional weather data to its own published timeline. This field is

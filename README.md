@@ -21,14 +21,30 @@ website, product specification, tests and publication workflow.
 Use Node.js 22 and pnpm 10.11.0.
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm test
-node build.mjs --data test/fixtures/timeline.json --incidents test/fixtures/incidents.json
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm check
 pnpm dev
 ```
 
 The development server serves `dist/` at `http://127.0.0.1:4173`. Fixture builds
 contain sample observations. Rebuild after source changes and reload the page.
+
+`pnpm check` runs the tests and builds the fixture preview. Use
+`pnpm build:fixture` to rebuild the preview while working. These commands need
+no API key or OboApp checkout. `pnpm build` without arguments generates the
+unavailable-data state.
+
+For a fresh Codex worktree, configure a local environment in the desktop app
+with these setup commands:
+
+```sh
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm build:fixture
+```
+
+Use `pnpm check` as a check action and `pnpm dev` as a development-server
+action. Commit the generated environment file under `.codex/` to share that
+setup. Node.js 22 and pnpm 10.11.0 must be available on the host.
 
 The frontend uses plain HTML, CSS and JavaScript. `build.mjs` generates the
 initial page, public JSON files, social images and static hosting files.
