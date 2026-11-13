@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildSite, fetchIncidents, fetchTimeline, getIncidentsUrl } from "../build.mjs";
+import { buildSite, fetchIncidentDailyHistory, fetchIncidents, fetchTimeline, getIncidentsUrl } from "../build.mjs";
 import { normalizeTimeline, presentation, serializeData } from "../data.mjs";
 import { getIncidentPath } from "../src/incident-history.js";
+import { getDailyHistoryDates } from "../src/incident-daily.js";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/timeline.json", import.meta.url), "utf8"));
 const incidents = JSON.parse(await readFile(new URL("./fixtures/incidents.json", import.meta.url), "utf8"));
@@ -163,6 +164,93 @@ test("derives the incident endpoint on the configured API origin without timelin
     "https://api.example.com/v1/sources/toplo-bg/incidents",
   );
   assert.throws(() => getIncidentsUrl("https://api.example.com/v1/messages"), /Toplo source timeline/);
+});
+
+test("fetches each previous daily capture once with authentication and reuses the current capture", async (context) => {
+  const requests = [];
+  context.mock.method(globalThis, "fetch", async (url, options) => {
+    const target = new URL(url);
+    requests.push({ target, options });
+    const date = target.searchParams.get("date");
+    if (date < "2026-11-09") {
+      return Response.json({ error: "No complete incident listing is available for the requested date" }, { status: 503 });
+    }
+    return Response.json({ ...incidents, observedAt: date + "T20:00:00Z" });
+  });
+  const history = await fetchIncidentDailyHistory("https://api.example.com/v1/sources/toplo-bg/timeline?days=366", "private-test-key", incidents);
+  assert.equal(requests.length, 13);
+  assert.equal(new Set(requests.map(({ target }) => {
+    return target.searchParams.get("date");
+  })).size, 13);
+  assert.equal(history.startDate, "2026-10-29");
+  assert.equal(history.endDate, "2026-11-11");
+  assert.equal(history.daily[0].snapshot, null);
+  assert.equal(history.daily.at(-2).snapshot.observedAt, "2026-11-10T20:00:00Z");
+  assert.equal(history.daily.at(-1).snapshot.observedAt, incidents.observedAt);
+  for (const { target, options } of requests) {
+    assert.equal(target.origin, "https://api.example.com");
+    assert.equal(target.pathname, "/v1/sources/toplo-bg/incidents");
+    assert.equal(options.headers["X-Api-Key"], "private-test-key");
+    assert.equal(options.redirect, "error");
+  }
+  assert.equal(JSON.stringify(history).includes("private-test-key"), false);
+});
+
+test("daily publication rejects unrelated outages, malformed captures and response-size overruns", async (context) => {
+  const apiUrl = "https://api.example.com/v1/sources/toplo-bg/timeline";
+  const invalid = [
+    () => Response.json({ error: "Storage unavailable" }, { status: 503 }),
+    () => Response.json({ error: "Unauthorized" }, { status: 401 }),
+    () => Response.json({ error: "Rate limited" }, { status: 429 }),
+    () => Response.json(incidents),
+    () => Response.json({ ...incidents, observedAt: "2026-10-29T15:00:00Z", count: 4 }),
+    () => new Response("bad json"),
+    () => new Response(" ".repeat(1_000_001)),
+    () => new Response("{}", { headers: { "content-length": "1000001" } }),
+    () => {
+      throw new Error("Network failure");
+    },
+  ];
+  context.mock.method(globalThis, "fetch", invalid[0]);
+  for (const response of invalid) {
+    globalThis.fetch = response;
+    await assert.rejects(fetchIncidentDailyHistory(apiUrl, "test-key", incidents));
+  }
+});
+
+test("publishes daily history as public JSON and escaped useful initial incident HTML", async () => {
+  const outDirectory = await mkdtemp(join(tmpdir(), "nastud-daily-build-"));
+  const history = JSON.parse(await readFile(new URL("./fixtures/incident-daily.json", import.meta.url), "utf8"));
+  try {
+    await buildSite({ data: fixture, incidents, incidentDaily: history, outDirectory });
+    const published = JSON.parse(await readFile(join(outDirectory, "incident-daily.json"), "utf8"));
+    const html = await readFile(join(outDirectory, getIncidentPath("oldest"), "index.html"), "utf8");
+    const bootstrap = /<script id="initial-incident-daily" type="application\/json">([\s\S]*?)<\/script>/.exec(html);
+    assert.deepEqual(published, JSON.parse(bootstrap[1]));
+    assert.equal(published.daily.length, 14);
+    assert.deepEqual(published.daily.map((day) => {
+      return day.date;
+    }), getDailyHistoryDates(incidents.observedAt));
+    assert.match(html, /<table/);
+    assert.match(html, /2026-11-10T/);
+    assert.match(html, /Промени по дни/);
+    const tableBody = /<tbody>([\s\S]*?)<\/tbody>/.exec(html)[1];
+    assert.equal((tableBody.match(/<tr /g) ?? []).length, 3);
+    assert.match(tableBody, /09\.11\.2026/);
+    assert.doesNotMatch(tableBody, /29\.10\.2026|Няма дневна проверка|Не е в списъка/);
+    const repairHtml = await readFile(join(outDirectory, getIncidentPath("repair"), "index.html"), "utf8");
+    const repairBody = /<tbody>([\s\S]*?)<\/tbody>/.exec(repairHtml)[1];
+    assert.match(repairBody, /Не е в списъка \(общо 2\)/);
+    assert.equal(bootstrap[1].includes("<"), false);
+
+    const mismatched = structuredClone(history);
+    mismatched.daily.at(-1).snapshot.incidents[0].estimatedEnd = null;
+    await assert.rejects(buildSite({ data: fixture, incidents, incidentDaily: mismatched, outDirectory }), /current complete capture/);
+    await assert.rejects(buildSite({ data: fixture, incidentDaily: history, outDirectory }), /current complete capture/);
+    assert.deepEqual(JSON.parse(await readFile(join(outDirectory, "incident-daily.json"), "utf8")), published);
+  } finally {
+    await rm(outDirectory, { recursive: true, force: true });
+  }
 });
 
 test("fetches authenticated listing data and refuses unavailable or partial listings", async (context) => {

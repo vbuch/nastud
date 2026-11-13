@@ -500,6 +500,77 @@
     font-size: 14px;
     line-height: 1.55;
   }
+  #counter-app .st-incident-daily {
+    padding-block: 8px 32px;
+  }
+  #counter-app .st-incident-daily h2 {
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: 500;
+  }
+  #counter-app .st-incident-daily-period {
+    margin: 0;
+    color: var(--st-muted);
+    font-size: 15px;
+  }
+  #counter-app .st-incident-daily-comparison {
+    margin-block: 20px;
+    padding: 16px;
+    border-left: 3px solid var(--st-temperature);
+    background: var(--st-road);
+  }
+  #counter-app .st-incident-daily-comparison h3 {
+    margin: 0 0 8px;
+    font-size: 17px;
+    font-weight: 500;
+  }
+  #counter-app .st-incident-daily-comparison p {
+    margin: 4px 0;
+  }
+  #counter-app .st-incident-daily-table {
+    width: 100%;
+    margin-top: 20px;
+    border-collapse: collapse;
+    table-layout: fixed;
+    text-align: left;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+  }
+  #counter-app .st-incident-daily-table caption {
+    margin-bottom: 10px;
+    color: var(--st-muted);
+    text-align: left;
+    font-size: 14px;
+  }
+  #counter-app .st-incident-daily-table th,
+  #counter-app .st-incident-daily-table td {
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--st-cover-groove);
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    font-weight: 400;
+  }
+  #counter-app .st-incident-daily-table th:first-child {
+    width: 32%;
+    padding-left: 0;
+  }
+  #counter-app .st-incident-daily-table th:nth-child(2) {
+    width: 25%;
+  }
+  #counter-app .st-incident-daily-table td:last-child,
+  #counter-app .st-incident-daily-table th:last-child {
+    padding-right: 0;
+  }
+  #counter-app .st-incident-daily-table thead,
+  #counter-app .st-incident-daily-table [data-history-state="unavailable"] {
+    color: var(--st-muted);
+  }
+  #counter-app .st-incident-daily-table span {
+    display: block;
+    margin-top: 3px;
+    color: var(--st-muted);
+    font-size: 0.9em;
+  }
   #counter-app .st-incident-more {
     padding: 18px 0;
     border-block: 1px solid var(--st-cover-groove);
@@ -532,6 +603,14 @@
     }
     #counter-app .st-incident-position-value {
       font-size: 32px;
+    }
+    #counter-app .st-incident-daily-table {
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    #counter-app .st-incident-daily-table th,
+    #counter-app .st-incident-daily-table td {
+      padding-inline: 5px;
     }
   }
   #counter-app .st-content {

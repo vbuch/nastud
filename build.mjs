@@ -8,10 +8,11 @@ import { renderShareImage } from "./share-image.mjs";
 import { normalizeIncidents } from "./src/incidents.js";
 import { fetchWeather } from "./weather.mjs";
 import { buildIncidentPages } from "./incident-page.mjs";
+import { getDailyHistoryDates, normalizeIncidentDailyHistory } from "./src/incident-daily.js";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 
-async function fetchApiJson(url, apiKey, label) {
+async function fetchApiJson(url, apiKey, label, { allowDailyGap = false } = {}) {
   const target = new URL(url);
   if (target.protocol !== "https:" && !(target.protocol === "http:" && ["localhost", "127.0.0.1"].includes(target.hostname))) {
     throw new Error("The " + label + " API must use HTTPS");
@@ -27,14 +28,39 @@ async function fetchApiJson(url, apiKey, label) {
     redirect: "error",
     signal: AbortSignal.timeout(15000),
   });
-  if (!response.ok) {
+  if (!response.ok && !(allowDailyGap && response.status === 503)) {
     throw new Error(label + " API returned HTTP " + response.status);
   }
-  const content = await response.text();
-  if (content.length > 1_000_000) {
+  if (Number(response.headers.get("content-length")) > 1_000_000) {
     throw new Error(label + " response exceeds the expected size");
   }
-  return JSON.parse(content);
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      size += value.byteLength;
+      if (size > 1_000_000) {
+        await reader.cancel();
+        throw new Error(label + " response exceeds the expected size");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const data = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  if (!response.ok) {
+    if (data.error === "No complete incident listing is available for the requested date") {
+      return null;
+    }
+    throw new Error(label + " API returned HTTP " + response.status);
+  }
+  return data;
 }
 
 export function fetchTimeline(url, apiKey) {
@@ -56,9 +82,32 @@ export async function fetchIncidents(timelineUrl, apiKey) {
   return normalizeIncidents(await fetchApiJson(getIncidentsUrl(timelineUrl), apiKey, "incidents"));
 }
 
+export async function fetchIncidentDailyHistory(timelineUrl, apiKey, snapshot) {
+  const current = normalizeIncidents(snapshot);
+  const dates = getDailyHistoryDates(current.observedAt);
+  const daily = [];
+  for (const date of dates) {
+    let capture = current;
+    if (date !== dates.at(-1)) {
+      const url = new URL(getIncidentsUrl(timelineUrl));
+      url.searchParams.set("date", date);
+      capture = await fetchApiJson(url, apiKey, "daily incidents", { allowDailyGap: true });
+    }
+    daily.push({ date, snapshot: capture });
+  }
+  return normalizeIncidentDailyHistory({
+    sourceType: current.sourceType,
+    locality: current.locality,
+    startDate: dates[0],
+    endDate: dates.at(-1),
+    daily,
+  });
+}
+
 export async function buildSite({
   data,
   incidents = null,
+  incidentDaily = null,
   weather,
   fetchWeatherHistory = false,
   outDirectory = resolve(directory, "dist"),
@@ -74,6 +123,14 @@ export async function buildSite({
     canonical.pathname += "/";
   }
   const incidentListing = incidents === null ? null : normalizeIncidents(incidents);
+  const history = incidentDaily === null ? null : normalizeIncidentDailyHistory(incidentDaily);
+  if (history && (
+    !incidentListing
+    || history.endDate !== sofiaDate(incidentListing.observedAt)
+    || JSON.stringify(history.daily.at(-1).snapshot) !== JSON.stringify(incidentListing)
+  )) {
+    throw new Error("Daily incident history must end with the current complete capture");
+  }
   const timelineInput = data ?? {
     sourceType: "toplo-bg",
     locality: "bg.sofia",
@@ -145,7 +202,7 @@ export async function buildSite({
     },
   });
   await cp(resolve(directory, "assets"), resolve(outDirectory, "assets"), { recursive: true });
-  const incidentPages = await buildIncidentPages({ snapshot: incidentListing, canonical, outDirectory, now });
+  const incidentPages = await buildIncidentPages({ snapshot: incidentListing, history, canonical, outDirectory, now });
   const sitemapUrls = [canonical.href, ...incidentPages].map((url) => {
     return "<url><loc>" + escapeHtml(url) + "</loc></url>";
   }).join("");
@@ -153,6 +210,7 @@ export async function buildSite({
     writeFile(resolve(outDirectory, "index.html"), html),
     writeFile(resolve(outDirectory, "timeline.json"), JSON.stringify(timeline)),
     writeFile(resolve(outDirectory, "incidents.json"), JSON.stringify(incidentListing)),
+    writeFile(resolve(outDirectory, "incident-daily.json"), JSON.stringify(history)),
     writeFile(resolve(outDirectory, imageName), image),
     writeFile(resolve(outDirectory, "share-square.png"), renderShareImage(timeline, { height: 1200, now })),
     writeFile(resolve(outDirectory, ".nojekyll"), ""),
@@ -161,7 +219,7 @@ export async function buildSite({
     writeFile(resolve(outDirectory, "sitemap.xml"), '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + sitemapUrls + "</urlset>"),
   ]);
   console.log("Counter built with " + timeline.daily.length + " daily points.");
-  return { timeline, incidents: incidentListing, values, html, imageName, outDirectory };
+  return { timeline, incidents: incidentListing, incidentDaily: history, values, html, imageName, outDirectory };
 }
 
 async function main() {
@@ -169,6 +227,7 @@ async function main() {
     options: {
       data: { type: "string" },
       incidents: { type: "string" },
+      "incident-daily": { type: "string" },
       weather: { type: "string" },
       out: { type: "string" },
       "site-url": { type: "string" },
@@ -178,6 +237,7 @@ async function main() {
   });
   let data;
   let incidents = null;
+  let incidentDaily = null;
   if (values.data) {
     data = JSON.parse(await readFile(resolve(values.data), "utf8"));
   } else if (values.fetch) {
@@ -190,12 +250,18 @@ async function main() {
   if (values.incidents) {
     incidents = JSON.parse(await readFile(resolve(values.incidents), "utf8"));
   }
+  if (values["incident-daily"]) {
+    incidentDaily = JSON.parse(await readFile(resolve(values["incident-daily"]), "utf8"));
+  } else if (values.fetch && !values.data) {
+    incidentDaily = await fetchIncidentDailyHistory(process.env.COUNTER_TIMELINE_URL, process.env.COUNTER_API_KEY, incidents);
+  }
   const weather = values.weather
     ? JSON.parse(await readFile(resolve(values.weather), "utf8"))
     : undefined;
   await buildSite({
     data,
     incidents,
+    incidentDaily,
     weather,
     fetchWeatherHistory: Boolean(values.fetch && !values.data && !values.weather),
     outDirectory: values.out ? resolve(values.out) : undefined,

@@ -6,6 +6,9 @@ sortable incident list and an interactive road with manhole covers. The timeline
 also compares incident counts with Sofia's daily mean temperature from
 Open-Meteo's ECMWF IFS history.
 
+Each current incident has a shareable page with its position, announced deadline
+and a table of daily changes from the latest 14 Sofia calendar days.
+
 OboApp supplies the data through its public API. This repository owns the
 website, product specification, tests and publication workflow.
 
@@ -65,6 +68,15 @@ without an API key. A weather outage leaves the incident chart
 available. Fixture builds include sample temperatures and need no network.
 See [temperature operations](docs/operations.md#temperature-history) for the
 source, daily averaging and attribution.
+
+The same build fetches the previous 13 daily incident listings once for all
+incident pages and reuses the current capture for the final day. Missing detailed
+captures remain visible gaps. The public `incident-daily.json` file and the
+initial incident HTML contain these observations without credentials. Use
+`--incident-daily test/fixtures/incident-daily.json` to supply offline history
+with a custom fixture build. See
+[daily incident operations](docs/operations.md#daily-incident-history) for request
+bounds and failure handling.
 
 ## Publication
 

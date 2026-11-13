@@ -38,23 +38,96 @@ Dispatches on other branches run the fixture checks and save a preview artifact.
 
 The check job installs locked dependencies, runs tests and builds a reviewable
 fixture artifact. The production jobs run when `PUBLISH_ENABLED` is `true`.
-They fetch both API responses, build the static output and publish `dist/`
-through GitHub Pages.
+They fetch the timeline, current incident listing and bounded daily incident
+history, build the static output and publish `dist/` through GitHub Pages.
 It publishes the HTML, public JSON, sharing images and hosting files together.
 Concurrency limits overlapping publications for the same Git reference.
 
 Current-data builds also request Sofia temperature history from Open-Meteo's
 archive API. This request uses no API key. Weather failure publishes the valid
-incident data with a temperature-unavailable notice. OboApp endpoint failures
-continue to stop publication.
+incident data with a temperature-unavailable notice. OboApp failures stop
+publication except for the documented unavailable-day response for dated
+incident history.
 
 Pull requests run tests and build fixture previews. They do not publish to the
 production Pages environment. Use a preview artifact to review a pull request.
 
-Production fetches require both OboApp endpoints to succeed and pass validation.
-Missing incident data, invalid incident responses or build failures leave the
+Production fetches require valid timeline and current incident responses.
+Missing current incident data, invalid responses or build failures leave the
 previous successful site in place. GitHub may cache public responses and social
 platforms may cache their own sharing previews.
+
+## Daily incident history
+
+Current-data builds publish a rolling window of 14 Sofia calendar days, ending
+on the current complete incident listing's observation date. They reuse that
+listing for the final day and fetch each preceding date once through
+`GET /v1/sources/toplo-bg/incidents?date=YYYY-MM-DD`. All incident pages share the
+fetched history. The provider selects the last complete capture from each
+requested day. Each row keeps its actual source-check timestamp.
+
+There are at most 13 dated requests plus the existing timeline and current
+listing requests, for at most 15 OboApp requests per publication. Each request
+uses the configured `X-Api-Key`, the same HTTPS and redirect restrictions, a
+15-second timeout and the existing 1 MB response limit. Requests have no
+automatic retry. Weather is a separate public request.
+
+A dated `503` with
+`{"error":"No complete incident listing is available for the requested date"}`
+publishes an unavailable day. Authentication, rate limits, other server errors,
+network failures and malformed or inconsistent captures stop the build. A
+verified empty capture remains an empty list. Null history, an empty capture,
+an incident absent from a complete capture and a present incident without an
+estimate retain their distinct meanings.
+
+`incident-daily.json` contains the public source, locality, window dates and
+`daily` entries with a date and either the complete validated snapshot or null.
+Each incident page includes the same data in its initial HTML. Browser refreshes
+read this same-origin file and preserve valid existing data after a failed or
+older refresh. They never call the authenticated provider API.
+
+The deployed provider's earliest retained detailed capture is
+`2026-11-11T15:55:42.543Z`, verified on 13 November 2026. Earlier dates in the
+requested window can therefore be unavailable even when aggregate counts or
+first-record estimates exist. Daily samples can omit changes within a day. A
+first-record baseline stays in the first-versus-current cards and supplies no
+missing daily position.
+
+Each incident table starts at the first available daily capture within the
+window that contains its stable ID. Leading days are omitted from that table;
+the public 14-day history keeps them. After the first row, show changes in
+listing state, position, total or the announced deadline's source calendar date.
+Later check times and the normal daily countdown do not add rows. Repeated
+unchanged unavailable or absent days use a date range. An earlier
+`firstObservedAt` does not add empty rows. The displayed coverage period still
+ends on the current observation date when the latest change row is older.
+Previous-day comparisons use the full daily samples, including hidden unchanged
+rows. The published and embedded capture data remain complete.
+
+The window moves with the latest complete incident observation. A source outage
+keeps that observation date as its end. The site continues to generate pages
+only for current incidents; retaining removed records needs the provider's full
+capture history. The published daily data expire as they leave the window.
+
+Fixture builds use no network. Supply
+`--incident-daily test/fixtures/incident-daily.json` with `--data` and
+`--incidents` for a custom offline history preview. The fixture must pass the
+same source, locality, date, timestamp, completeness and identity validation.
+
+After publication, inspect `incident-daily.json` and open a current incident.
+Check that the table starts at the first available capture containing the
+incident and then shows changed states or values. Check an unchanged incident
+over several days, a total-only change, a deadline correction, a missing
+estimate and repeated missing or absent days shown as ranges. Confirm that the
+coverage period reaches the current observation even when its row is omitted.
+Check dated position/total and deadline rows against complete captures. Compare
+only the preceding calendar day's full sample with the current capture, using
+explicit dates even when that sample has no row in the change table.
+Verify gap, empty-list, absent-record and missing-estimate wording. Check an
+older source observation, changed listing ID and deadline changes in both
+directions. Check desktop, 320px portrait and phone landscape layouts, keyboard
+access and the first-versus-current cards. Daily history must be readable in
+the initial HTML before JavaScript runs.
 
 ## Temperature history
 
@@ -132,7 +205,7 @@ width, 320px phone width and phone landscape.
 4. Open a pull request and wait for its required checks.
 5. Merge the tested change to `main`.
 6. Follow the Pages workflow to a successful build and deployment.
-7. Check `https://nastud.site/`, `timeline.json` and `incidents.json`.
+7. Check `https://nastud.site/`, `timeline.json`, `incidents.json` and `incident-daily.json`.
 8. Confirm that the displayed count equals the incident count and that the counter and list use the same original observation timestamp.
 9. Open the list from the “Аварии и ремонти” heading, change a sort and filter, and check the first result. Close with Escape and verify that focus returns to the heading. Check phone layout when the release changes layout.
 10. For sharing changes, verify initial-HTML metadata and that the landscape and square image URLs return valid PNGs.
@@ -153,9 +226,10 @@ secondary, and no dedicated copy-link control is shown. Compare unknown and
 passed estimates and a missing first capture. The first and latest checks use
 readable cards with distinct check dates, deadlines and plain days-remaining
 labels. Open “Още подробности” with a keyboard and check the extra dates and
-changed-start warning. Intermediate deadline changes
-and position history require a future provider history response; the current
-build must not infer them from aggregate counts.
+changed-start warning. Check the chronological daily position and deadline table,
+its requested period, original check times and previous-day comparison. The
+table uses complete daily samples; intermediate changes within each day need a
+future full-history response.
 
 Each publication generates `incident/{encoded-id}/index.html`, `share.png` and
 `share-square.png` for every current incident. The path uses URL-safe base64 of

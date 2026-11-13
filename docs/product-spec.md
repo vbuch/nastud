@@ -76,9 +76,15 @@ deadline extensions.
 - Show position and total as a smaller secondary card across all current accidents and repairs, sorted by oldest reported start with the same stable tie ordering as the list. Use the plain label “Място в списъка”, explain the date ordering and state that the repair order is unknown.
 - Keep this comparable position independent of the list's selected sort and type filter. A missing incident has no current position.
 - Show the signed calendar days from the source-check date in Sofia to the current estimate's source calendar date. A passed estimate is overdue; an unknown estimate stays unknown.
-- Under “Как се промени срокът”, compare the first and latest checks in two readable cards. Each card separates the check date from the announced deadline and describes days remaining or overdue in ordinary Bulgarian. Show the net difference from the first captured estimate above the cards. Stack cards on narrow screens. Omit the tiny plot and numeric table.
-- Include a short explanation of missing intermediate changes below the comparison. When only the current check is known, say so. Full position history and a deadline burndown require dated detailed captures from OboApp.
-- Keep reported start, age, first check, changed-start warning and unavailable position history under a keyboard-accessible “Още подробности” disclosure. Preserve distinctions between unknown current and first recorded estimates.
+- Under “Как се промени срокът”, compare the first and latest checks in two readable cards. Each card separates the check date from the announced deadline and describes days remaining or overdue in ordinary Bulgarian. Show the net difference from the first captured estimate above the cards. Stack cards on narrow screens.
+- Keep the first-versus-current cards separate from the daily history. Explain that the daily samples can omit changes made within a day. When only the current check is known, say so.
+- Use the latest 14 Sofia calendar days as the daily history window, ending on the current listing's observation date. Reuse that current capture for the final day and use OboApp's last complete capture from each preceding day. Start each incident's chronological table at the first available daily capture in that window that contains its stable ID. Under “Промени по дни”, retain this first row and then show changes in listing state, position, complete-list total or announced deadline's source calendar date. A later check time and the natural days-remaining countdown do not add rows.
+- For each displayed day, show its actual source-check timestamp, the incident's position and complete-list total, announced deadline and signed calendar days remaining when known. Calculate positions across all accidents and repairs with the same oldest-first ordering and tie rules as the current summary.
+- After the first appearance, distinguish an unavailable daily capture, an incident absent from a complete capture, a verified empty listing and a listed incident with no estimate. Summarize repeated unchanged unavailable or absent days as a date range. Listing absence does not confirm restoration of service.
+- Compare the current capture with the preceding Sofia calendar day only when the incident is present in both. Use the full daily samples for this comparison, including samples omitted from the change table. Compare positions when known and deadlines only when both estimates are known. Name both dates explicitly, including for older observations.
+- Label the coverage period and daily sampling clearly. The period runs from the first displayed appearance through the current observation date even when the latest change row is older. Keep first-record baselines outside the table unless a complete dated capture actually supplies that row. An earlier `firstObservedAt` does not add leading empty rows. Aggregate counts and first-record fields do not fill detailed-history gaps.
+- Keep the table readable at 320px and accessible with a keyboard. Preserve the current summary, first-versus-current deadline cards and stable incident URL.
+- Keep reported start, age, first check and changed-start warning under a keyboard-accessible “Още подробности” disclosure. Preserve distinctions between unknown current and first recorded estimates.
 - Use the normal incident URL for browser sharing. Keep the page focused on incident information and omit a dedicated copy-link control.
 - Link back to the complete list using the main page's `#incidents` fragment, which opens the incident dialog on arrival.
 - Refresh the page from the same public incident snapshot as the main list. Preserve a newer snapshot and its timestamp after an older or failed refresh.
@@ -89,11 +95,11 @@ deadline extensions.
 ## Data and failure behavior
 
 - OboApp is the data provider. This website fetches its API during publication and serves the resulting public JSON from its own origin.
-- Read both the timeline and incident endpoints. Reject incomplete, malformed or mismatched responses.
+- Read the timeline, current incident listing and bounded dated incident listings during publication. Fetch each daily listing once for all incident pages. Reject incomplete, malformed or mismatched responses.
 - Require the declared incident count to match the complete list and require unique identities within a capture.
 - Use `id`, derived from Toplo's `ContentItemId`, for stable record identity. `accidentId` is a within-capture listing identity and can change between reads.
 - Keep unknown estimates and first observations as null values. Never convert missing data into a false zero.
-- A failed API read or invalid build input stops publication, preserving the previous successful release.
+- A failed API read or invalid build input stops publication, preserving the previous successful release. The documented missing-history response for a dated listing produces an unknown day; other request failures stop publication.
 - Browser refresh failures preserve the last valid records and their timestamp. Do not replace a newer incident observation with an older one.
 - Refresh the counter data while the page is visible. Refresh incident data when the list opens and while it remains open.
 - Treat source text as text. Upstream names or addresses cannot inject markup or executable code.
@@ -128,6 +134,9 @@ deadline extensions.
 Automated tests cover observation dates, real zero values, missing baselines,
 stale data, input validation, list completeness, sorting, missing and earlier
 estimates, source-date handling, safe bootstrap data and sharing image output.
+Daily incident checks cover capture-date validation, tied and unknown starts,
+changed listing IDs, missing days, empty captures, absence and reappearance,
+deadline comparisons and Sofia midnight and daylight-saving boundaries.
 
 Browser review covers the main view, graph interaction, full-list opening,
 sorting, filtering, scrolling, close and focus behavior at desktop and phone

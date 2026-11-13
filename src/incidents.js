@@ -1,6 +1,7 @@
 import { formatObservedLabel, getSofiaDateKey } from "./app.js";
 import { getIncidentPath } from "./incident-history.js";
 import { getIncidentDetailView } from "./incident-view.js";
+import { normalizeIncidentDailyHistory } from "./incident-daily.js";
 
 const SOURCE_URL = "https://toplo.bg/accidents-and-maintenance";
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
@@ -166,7 +167,8 @@ export function sortIncidents(incidents, sort = "oldest") {
     } else {
       comparison = compareNullable(timestamp(left.reportedStart), timestamp(right.reportedStart), sort === "newest");
     }
-    return comparison || left.name.localeCompare(right.name, "bg") || left.id.localeCompare(right.id);
+    const identityOrder = left.id === right.id ? 0 : left.id < right.id ? -1 : 1;
+    return comparison || left.name.localeCompare(right.name, "bg") || identityOrder;
   });
 }
 
@@ -329,8 +331,63 @@ function renderMore(incident, observedAt, view) {
   if (view.changedStart) {
     more.append(element("p", "st-incident-flag", view.changedStart));
   }
-  more.append(element("p", "st-incident-history-note", "Нямаме данни за предишните места в списъка."));
+  if (!view.daily) {
+    more.append(element("p", "st-incident-history-note", "Нямаме данни за предишните места в списъка."));
+  }
   return more;
+}
+
+function renderDaily(view) {
+  const section = element("section", "st-incident-daily");
+  section.append(element("h2", "", "Промени по дни"));
+  section.append(element("p", "st-incident-daily-period", "Период: " + view.period));
+  section.append(element("p", "st-incident-history-note", "Показваме първата дневна проверка, в която записът присъства, и следващите промени в мястото, общия брой или обявения срок. За всеки ден използваме последната запазена пълна проверка за София. Промени в рамките на деня може да липсват."));
+  if (view.comparison) {
+    const comparison = element("div", "st-incident-daily-comparison");
+    comparison.append(element("h3", "", view.comparison.label));
+    if (view.comparison.position) {
+      comparison.append(element("p", "", view.comparison.position));
+    }
+    if (view.comparison.deadline) {
+      comparison.append(element("p", "", view.comparison.deadline));
+    }
+    section.append(comparison);
+  }
+  const table = element("table", "st-incident-daily-table");
+  table.append(element("caption", "", "Промени в мястото и обявения срок. Часовете са за София."));
+  const head = element("thead");
+  const labels = element("tr");
+  for (const label of ["Проверка", "Място", "Обявен срок"]) {
+    const cell = element("th", "", label);
+    cell.setAttribute("scope", "col");
+    labels.append(cell);
+  }
+  head.append(labels);
+  table.append(head);
+  const body = element("tbody");
+  for (const row of view.rows) {
+    const item = element("tr");
+    item.dataset.historyState = row.state;
+    const check = element("th");
+    check.setAttribute("scope", "row");
+    const date = element(row.observedAt ? "time" : "span", "", row.dateLabel);
+    if (row.observedAt) {
+      date.dateTime = row.observedAt;
+    }
+    date.append(element("span", "", row.checkedTime));
+    check.append(date);
+    item.append(check, element("td", "", row.positionLabel));
+    const deadline = element("td", "", row.deadlineLabel);
+    if (row.remainingLabel) {
+      deadline.append(element("span", "", row.remainingLabel));
+    }
+    item.append(deadline);
+    body.append(item);
+  }
+  table.append(body);
+  section.append(table);
+  section.append(element("p", "st-incident-history-note", "„Няма дневна проверка“ означава липсващи подробни данни. Отсъствието от пълен списък не потвърждава приключване."));
+  return section;
 }
 
 export function startIncidentPage() {
@@ -360,6 +417,7 @@ export function startIncidentPage() {
     return;
   }
   let snapshot = null;
+  let history = null;
   let pending = false;
 
   function render() {
@@ -374,10 +432,26 @@ export function startIncidentPage() {
       return;
     }
     document.getElementById("incident-page-heading").textContent = incident.name;
-    const view = getIncidentDetailView(incident, snapshot);
+    const view = getIncidentDetailView(incident, snapshot, history);
     document.getElementById("incident-page-type").textContent = view.type;
     document.getElementById("incident-page-addresses").textContent = view.addresses;
-    detail.replaceChildren(renderOverview(view), renderProgress(view), renderMore(incident, snapshot.observedAt, view));
+    const moreWasOpen = [...detail.children].some((child) => {
+      return child.tagName.toLowerCase() === "details" && child.open;
+    });
+    const moreHadFocus = [...detail.children].some((child) => {
+      return child.tagName.toLowerCase() === "details" && child.contains(document.activeElement);
+    });
+    const more = renderMore(incident, snapshot.observedAt, view);
+    more.open = moreWasOpen;
+    const sections = [renderOverview(view), renderProgress(view)];
+    if (view.daily) {
+      sections.push(renderDaily(view.daily));
+    }
+    sections.push(more);
+    detail.replaceChildren(...sections);
+    if (moreHadFocus) {
+      more.children[0].focus({ preventScroll: true });
+    }
   }
 
   function accept(value) {
@@ -389,6 +463,28 @@ export function startIncidentPage() {
     render();
   }
 
+  function acceptHistory(value) {
+    const next = normalizeIncidentDailyHistory(value);
+    if (history && next.endDate < history.endDate) {
+      return;
+    }
+    if (history) {
+      const previous = new Map(history.daily.map((day) => {
+        return [day.date, day.snapshot];
+      }));
+      for (const day of next.daily) {
+        const saved = previous.get(day.date);
+        if (saved && (!day.snapshot || Date.parse(saved.observedAt) > Date.parse(day.snapshot.observedAt))) {
+          day.snapshot = saved;
+        }
+      }
+    }
+    history = next;
+    if (snapshot) {
+      render();
+    }
+  }
+
   async function refresh() {
     if (pending || document.hidden) {
       return;
@@ -398,23 +494,44 @@ export function startIncidentPage() {
     const timeout = window.setTimeout(() => {
       controller.abort();
     }, 10000);
-    try {
-      const response = await fetch(new URL("./incidents.json", document.baseURI), { cache: "no-store", signal: controller.signal });
+    async function readPublicData(path) {
+      const response = await fetch(new URL(path, document.baseURI), { cache: "no-store", signal: controller.signal });
       if (!response.ok) {
-        throw new Error("Incident listing unavailable");
+        throw new Error("Published incident data unavailable");
       }
-      accept(await response.json());
-      document.getElementById("incident-page-notice").textContent = "";
-    } catch {
-      document.getElementById("incident-page-notice").textContent = snapshot
-        ? "Не успяхме да обновим данните. Показваме последния запазен списък от проверката по-горе."
-        : "Данните временно не са достъпни.";
+      return response.json();
+    }
+    try {
+      const [listingResult, historyResult] = await Promise.allSettled([
+        readPublicData("./incidents.json").then(accept),
+        readPublicData("./incident-daily.json").then(acceptHistory),
+      ]);
+      const notices = [];
+      if (listingResult.status === "rejected") {
+        notices.push(snapshot
+          ? "Не успяхме да обновим данните. Показваме последния запазен списък от проверката по-горе."
+          : "Данните временно не са достъпни.");
+      }
+      if (historyResult.status === "rejected") {
+        notices.push(history
+          ? "Дневната история не се обнови. Показваме запазените дневни проверки."
+          : "Дневната история временно не е достъпна.");
+      }
+      document.getElementById("incident-page-notice").textContent = notices.join(" ");
     } finally {
       window.clearTimeout(timeout);
       pending = false;
     }
   }
 
+  try {
+    const initialHistory = document.getElementById("initial-incident-daily");
+    if (initialHistory?.textContent.trim() && initialHistory.textContent.trim() !== "null") {
+      acceptHistory(JSON.parse(initialHistory.textContent));
+    }
+  } catch {
+    // Keep the initial HTML available if its daily bootstrap cannot be read.
+  }
   try {
     accept(JSON.parse(document.getElementById("initial-incidents").textContent));
   } catch {

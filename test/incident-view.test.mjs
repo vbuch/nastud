@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { getIncidentDetailView } from "../src/incident-view.js";
+import { getIncidentDailyView, getIncidentDetailView } from "../src/incident-view.js";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/incidents.json", import.meta.url), "utf8"));
 
@@ -134,4 +134,111 @@ test("an invalid deadline cannot appear as a same-day or zero-day estimate", () 
   assert.equal(view.overdue, false);
   assert.equal(view.change, null);
   assert.doesNotMatch(view.remaining, /0 дни|в деня на проверката/);
+});
+
+test("daily table distinguishes missing captures, listing absence and an unknown recorded deadline", () => {
+  const first = { ...fixture, observedAt: "2026-11-07T20:00:00Z" };
+  const absent = { ...fixture, observedAt: "2026-11-09T21:30:00Z", count: 0, incidents: [] };
+  const unknown = structuredClone(fixture);
+  unknown.observedAt = "2026-11-10T20:30:00Z";
+  unknown.incidents[2].estimatedEnd = null;
+  const history = {
+    sourceType: "toplo-bg",
+    locality: "bg.sofia",
+    startDate: "2026-11-06",
+    endDate: "2026-11-11",
+    daily: [
+      { date: "2026-11-06", snapshot: null },
+      { date: "2026-11-07", snapshot: first },
+      { date: "2026-11-08", snapshot: null },
+      { date: "2026-11-09", snapshot: absent },
+      { date: "2026-11-10", snapshot: unknown },
+      { date: "2026-11-11", snapshot: fixture },
+    ],
+  };
+
+  const view = getIncidentDailyView(history, fixture, "repair");
+
+  assert.equal(view.period, "07.11.2026 г. до 11.11.2026 г.");
+  assert.equal(view.rows.length, 5);
+  assert.equal(view.rows[0].date, "2026-11-07");
+  assert.equal(view.rows[1].checkedTime, "Няма дневна проверка");
+  assert.equal(view.rows[1].dateLabel, "08.11.2026 г.");
+  assert.equal(view.rows[1].positionLabel, "Няма данни");
+  assert.equal(view.rows[2].positionLabel, "Не е в списъка (общо 0)");
+  assert.equal(view.rows[2].dateLabel, "09.11.2026 г.");
+  assert.equal(view.rows[2].deadlineLabel, "Не се прилага");
+  assert.equal(view.rows[3].checkedTime, "22:30 ч.");
+  assert.equal(view.rows[3].deadlineLabel, "Няма обявен срок");
+  assert.equal(view.rows[4].positionLabel, "№ 2 от 3");
+  assert.equal(view.rows[4].remainingLabel, "Тогава оставаха 12 дни.");
+  assert.equal(view.comparison.deadline, null);
+  assert.equal(view.comparison.position, "Мястото е без промяна.");
+});
+
+test("daily comparison names exact dates and describes earlier and later recorded deadlines", () => {
+  for (const [estimate, expected] of [
+    ["2026-11-22T23:59:00Z", "Обявеният срок е с 1 ден по-късен."],
+    ["2026-11-24T23:59:00Z", "Обявеният срок е с 1 ден по-ранен."],
+    ["2026-11-23T23:59:00Z", "Обявеният срок е без промяна."],
+  ]) {
+    const previous = structuredClone(fixture);
+    previous.observedAt = "2026-11-10T20:30:00Z";
+    previous.incidents[2].estimatedEnd = estimate;
+    const history = {
+      startDate: "2026-11-10",
+      endDate: "2026-11-11",
+      daily: [
+        { date: "2026-11-10", snapshot: previous },
+        { date: "2026-11-11", snapshot: fixture },
+      ],
+    };
+    const view = getIncidentDailyView(history, fixture, "repair");
+    assert.equal(view.comparison.label, "От 10.11.2026 г. до 11.11.2026 г.");
+    assert.equal(view.comparison.deadline, expected);
+    assert.doesNotMatch(view.comparison.label, /вчера/);
+  }
+});
+
+test("daily change rows omit unchanged checks while retaining the full period and previous-day comparison", () => {
+  const history = {
+    startDate: "2026-11-09",
+    endDate: "2026-11-11",
+    daily: ["2026-11-09", "2026-11-10", "2026-11-11"].map((date) => {
+      return { date, snapshot: { ...fixture, observedAt: date + "T15:00:00Z" } };
+    }),
+  };
+
+  const view = getIncidentDailyView(history, fixture, "repair");
+
+  assert.equal(view.period, "09.11.2026 г. до 11.11.2026 г.");
+  assert.equal(view.rows.length, 1);
+  assert.equal(view.rows[0].dateLabel, "09.11.2026 г.");
+  assert.equal(view.rows[0].observedAt, "2026-11-09T15:00:00Z");
+  assert.equal(view.rows[0].remainingLabel, "Тогава оставаха 14 дни.");
+  assert.equal(view.comparison.label, "От 10.11.2026 г. до 11.11.2026 г.");
+  assert.equal(view.comparison.deadline, "Обявеният срок е без промяна.");
+});
+
+test("repeated unavailable checks have a visible date range before the next known change", () => {
+  const history = {
+    startDate: "2026-11-07",
+    endDate: "2026-11-11",
+    daily: [
+      { date: "2026-11-07", snapshot: { ...fixture, observedAt: "2026-11-07T15:00:00Z" } },
+      { date: "2026-11-08", snapshot: null },
+      { date: "2026-11-09", snapshot: null },
+      { date: "2026-11-10", snapshot: null },
+      { date: "2026-11-11", snapshot: fixture },
+    ],
+  };
+
+  const view = getIncidentDailyView(history, fixture, "repair");
+
+  assert.equal(view.rows.length, 3);
+  assert.equal(view.rows[1].dateLabel, "08.11.2026 г. до 10.11.2026 г.");
+  assert.equal(view.rows[1].checkedTime, "Няма дневна проверка");
+  assert.equal(view.rows[1].observedAt, null);
+  assert.equal(view.rows[2].dateLabel, "11.11.2026 г.");
+  assert.equal(view.comparison, null);
 });
