@@ -40,7 +40,7 @@ jobs:
           path: dist
 
   build:
-    if: github.event_name != 'pull_request' && vars.PUBLISH_ENABLED == 'true'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.PUBLISH_ENABLED == 'true'
     needs: check
     runs-on: ubuntu-latest
     permissions:

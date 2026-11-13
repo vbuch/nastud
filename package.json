@@ -5,6 +5,8 @@
   "description": "Toplo accident and maintenance count, daily timeline and steam toy",
   "scripts": {
     "build": "node build.mjs",
+    "build:fixture": "node build.mjs --data test/fixtures/timeline.json --incidents test/fixtures/incidents.json",
+    "check": "pnpm test && pnpm build:fixture",
     "dev": "node serve.mjs",
     "test": "node --test test/*.test.mjs",
     "test:run": "node --test test/*.test.mjs"
@@ -13,6 +15,9 @@
   "author": "",
   "license": "Unlicense",
   "packageManager": "pnpm@10.11.0",
+  "engines": {
+    "node": "22.x"
+  },
   "type": "module",
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2"

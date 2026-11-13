@@ -4,6 +4,22 @@ Read [the product specification](docs/product-spec.md) before changing behavior
 or layout. Update the relevant specification and operations notes in the same
 change when the intended behavior changes.
 
+## Start here
+
+- Work from this repository's root. Read [the README](README.md) for setup and [the API expectations](docs/api-contract.md) before changing data handling.
+- Use Node.js 22 and pnpm 10.11.0. In a fresh checkout or worktree, run `pnpm install --frozen-lockfile --ignore-scripts`, then `pnpm check`.
+- Use `pnpm build:fixture` for a local preview and `pnpm dev` to serve it at `http://127.0.0.1:4173`. Rebuild after source changes and reload the page.
+- Fixture development needs no API key or OboApp checkout. Current-data builds and publication configuration are described in [operations](docs/operations.md).
+
+## Source map
+
+- `src/index.html`, `src/styles.css`: page structure, metadata and layout.
+- `src/app.js`, `src/incidents.js`, `src/road.js`: browser behavior, shared incident rules and road interaction.
+- `data.mjs`, `build.mjs`, `share-image.mjs`: timeline interpretation, static publication and sharing images.
+- `test/*.test.mjs`, `test/fixtures/`: automated checks and sample API responses.
+- `.github/workflows/pages.yml`: pull-request previews and production publication.
+- `dist/`: generated output. Make source changes in the files above and rebuild.
+
 ## Repository scope
 
 - This repository owns nastud.site, its static build, tests and GitHub Pages workflow.
@@ -44,6 +60,9 @@ Run these from the repository root before submitting or publishing a change:
 pnpm test
 node build.mjs --data test/fixtures/timeline.json --incidents test/fixtures/incidents.json
 ```
+
+`pnpm check` runs both checks. There is currently no lint or static-analysis
+command in `package.json`.
 
 Add meaningful regression coverage for changed data interpretation, validation,
 sorting or failure behavior. Use fixtures in tests and pull-request builds.
